@@ -1,24 +1,18 @@
-/* Guard vision cones with cast occlusion shadows, single-cone CCTV sweeps, EMP waves, coin, smoke. */
-
-export function renderGuardVisionCones(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+export function renderGuardVisionCones(ctx, state, cam) {
   ctx.save();
-  ctx.translate(worldX, worldY);
-  ctx.scale(worldScale, worldScale);
-  ctx.beginPath();
-  ctx.rect(18, 18, state.width - 36, state.height - 36);
-  ctx.clip();
+  applyWorldTransform(ctx, cam);
+  clipInteriorArena(ctx, state);
 
-  drawArchitecturalPatrolHairlines(ctx, state.guards);
+  drawPatrolTrackHairlines(ctx, state.guards);
   for (const g of state.guards) {
     if (!g.conePoly || g.conePoly.length < 3) continue;
     drawCastOcclusionShadows(ctx, g.conePoly, g.x, g.y, g.range);
 
-    const hot = g.state === 'SPOTTED';
+    const hot = g.state === 'SPOTTED' || state.lockdown;
     const grad = ctx.createRadialGradient(g.x, g.y, 10, g.x, g.y, g.range);
-    grad.addColorStop(0, hot ? 'rgba(239, 68, 68, 0.54)' : 'rgba(239, 68, 68, 0.38)');
-    grad.addColorStop(0.72, hot ? 'rgba(220, 38, 38, 0.28)' : 'rgba(220, 38, 38, 0.17)');
-    grad.addColorStop(1, 'rgba(185, 28, 28, 0.05)');
+    grad.addColorStop(0, hot ? 'rgba(255, 46, 76, 0.58)' : 'rgba(255, 46, 76, 0.44)');
+    grad.addColorStop(0.72, hot ? 'rgba(225, 29, 72, 0.30)' : 'rgba(225, 29, 72, 0.20)');
+    grad.addColorStop(1, 'rgba(190, 18, 60, 0.06)');
 
     ctx.beginPath();
     g.conePoly.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
@@ -26,55 +20,70 @@ export function renderGuardVisionCones(ctx, state, layout) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    ctx.strokeStyle = hot ? '#FCA5A5' : '#FF6B6B';
+    ctx.strokeStyle = hot ? '#FDA4AF' : PALETTE.guardEdge;
     ctx.lineWidth = 2.4;
     ctx.stroke();
   }
   ctx.restore();
 }
 
-export function renderCameraSweepCones(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+export function renderCameraSweepCones(ctx, state, cam) {
   ctx.save();
-  ctx.translate(worldX, worldY);
-  ctx.scale(worldScale, worldScale);
-  ctx.beginPath();
-  ctx.rect(18, 18, state.width - 36, state.height - 36);
-  ctx.clip();
+  applyWorldTransform(ctx, cam);
+  clipInteriorArena(ctx, state);
 
-  for (const cam of state.cameras) {
-    if (cam.jammedTimer > 0) {
-      drawJammedBrokenArc(ctx, cam);
+  for (const cc of state.cameras) {
+    if (cc.jammedTimer > 0) {
+      drawJammedBrokenArc(ctx, cc);
       continue;
     }
-    if (!cam.conePoly || cam.conePoly.length < 3) continue;
-    drawCastOcclusionShadows(ctx, cam.conePoly, cam.x, cam.y, cam.range);
+    if (!cc.conePoly || cc.conePoly.length < 3) continue;
+    drawCastOcclusionShadows(ctx, cc.conePoly, cc.x, cc.y, cc.range);
 
-    const grad = ctx.createRadialGradient(cam.x, cam.y, 8, cam.x, cam.y, cam.range);
-    grad.addColorStop(0, 'rgba(34, 211, 238, 0.34)');
-    grad.addColorStop(0.74, 'rgba(6, 182, 212, 0.15)');
+    const grad = ctx.createRadialGradient(cc.x, cc.y, 8, cc.x, cc.y, cc.range);
+    grad.addColorStop(0, 'rgba(34, 211, 238, 0.38)');
+    grad.addColorStop(0.72, 'rgba(6, 182, 212, 0.16)');
     grad.addColorStop(1, 'rgba(6, 182, 212, 0.04)');
 
     ctx.beginPath();
-    cam.conePoly.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    cc.conePoly.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.9)';
+    ctx.strokeStyle = PALETTE.camEdge;
     ctx.lineWidth = 2.1;
     ctx.stroke();
 
-    drawUnclippedSweepArc(ctx, cam);
+    drawUnclippedSweepArc(ctx, cc);
   }
   ctx.restore();
 }
 
-export function renderAcousticAndSmokeFields(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+/* Crimson guard vision cones, ice-cyan CCTV cones, cast shadows, cut rims, smoke, violet EMP, and gold coin fields. */
+import { drawWorldBadge } from './arenaRenderer.js';
+import { WALL_THICK } from './authoredVaults.js';
+import { applyWorldTransform } from './thiefControls.js';
+import { PALETTE, UI_FONT } from './toolsAndEconomy.js';
+
+export function renderOcclusionCutRims(ctx, state, cam) {
   ctx.save();
-  ctx.translate(worldX, worldY);
-  ctx.scale(worldScale, worldScale);
+  applyWorldTransform(ctx, cam);
+  clipInteriorArena(ctx, state);
+
+  for (const g of state.guards) {
+    strokeClippedRim(ctx, g.conePoly, 'rgba(255, 46, 76, 0.52)', '#FFF1F2', 5.6, 2.8);
+  }
+  for (const cc of state.cameras) {
+    if (cc.jammedTimer > 0) continue;
+    strokeClippedRim(ctx, cc.conePoly, 'rgba(34, 211, 238, 0.46)', '#ECFEFF', 4.6, 2.4);
+  }
+  ctx.restore();
+}
+
+export function renderAcousticAndSmokeFields(ctx, state, cam) {
+  ctx.save();
+  applyWorldTransform(ctx, cam);
 
   for (const r of state.ripples) {
     ctx.save();
@@ -93,23 +102,10 @@ export function renderAcousticAndSmokeFields(ctx, state, layout) {
   ctx.restore();
 }
 
-export function renderOcclusionCutRims(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
-  ctx.save();
-  ctx.translate(worldX, worldY);
-  ctx.scale(worldScale, worldScale);
+function clipInteriorArena(ctx, state) {
   ctx.beginPath();
-  ctx.rect(18, 18, state.width - 36, state.height - 36);
+  ctx.rect(WALL_THICK, WALL_THICK, state.width - WALL_THICK * 2, state.height - WALL_THICK * 2);
   ctx.clip();
-
-  for (const g of state.guards) {
-    strokeClippedRim(ctx, g.conePoly, 'rgba(255, 107, 107, 0.45)', '#FFF1F2', 5.6, 3.0);
-  }
-  for (const cam of state.cameras) {
-    if (cam.jammedTimer > 0) continue;
-    strokeClippedRim(ctx, cam.conePoly, 'rgba(34, 211, 238, 0.38)', '#ECFEFF', 4.6, 2.4);
-  }
-  ctx.restore();
 }
 
 function extractClippedStrips(conePoly) {
@@ -132,8 +128,7 @@ function extractClippedStrips(conePoly) {
 }
 
 function strokeClippedRim(ctx, conePoly, glowColor, coreColor, glowW, coreW) {
-  const strips = extractClippedStrips(conePoly);
-  for (const strip of strips) {
+  for (const strip of extractClippedStrips(conePoly)) {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -150,11 +145,11 @@ function strokeClippedRim(ctx, conePoly, glowColor, coreColor, glowW, coreW) {
   }
 }
 
-function drawUnclippedSweepArc(ctx, cam) {
-  const poly = cam.conePoly;
-  const r = cam.range + 8;
+function drawUnclippedSweepArc(ctx, cc) {
+  const poly = cc.conePoly;
+  const r = cc.range + 8;
   ctx.save();
-  ctx.strokeStyle = 'rgba(103, 232, 249, 0.34)';
+  ctx.strokeStyle = 'rgba(103, 232, 249, 0.38)';
   ctx.lineWidth = 1.5;
   ctx.setLineDash([5, 7]);
   ctx.beginPath();
@@ -165,9 +160,9 @@ function drawUnclippedSweepArc(ctx, cam) {
       penDown = false;
       continue;
     }
-    const ang = Math.atan2(pt.y - cam.y, pt.x - cam.x);
-    const ax = cam.x + Math.cos(ang) * r;
-    const ay = cam.y + Math.sin(ang) * r;
+    const ang = Math.atan2(pt.y - cc.y, pt.x - cc.x);
+    const ax = cc.x + Math.cos(ang) * r;
+    const ay = cc.y + Math.sin(ang) * r;
     if (!penDown) {
       ctx.moveTo(ax, ay);
       penDown = true;
@@ -181,8 +176,7 @@ function drawUnclippedSweepArc(ctx, cam) {
 }
 
 function drawCastOcclusionShadows(ctx, conePoly, ox, oy, range) {
-  const strips = extractClippedStrips(conePoly);
-  for (const strip of strips) {
+  for (const strip of extractClippedStrips(conePoly)) {
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(strip[0].x, strip[0].y);
@@ -191,9 +185,9 @@ function drawCastOcclusionShadows(ctx, conePoly, ox, oy, range) {
     ctx.closePath();
 
     const umbra = ctx.createRadialGradient(ox, oy, 18, ox, oy, range);
-    umbra.addColorStop(0.15, 'rgba(2, 8, 18, 0.80)');
-    umbra.addColorStop(0.72, 'rgba(3, 11, 24, 0.68)');
-    umbra.addColorStop(1, 'rgba(3, 11, 24, 0.34)');
+    umbra.addColorStop(0.12, 'rgba(4, 5, 10, 0.86)');
+    umbra.addColorStop(0.7, 'rgba(6, 8, 14, 0.72)');
+    umbra.addColorStop(1, 'rgba(6, 8, 14, 0.38)');
     ctx.fillStyle = umbra;
     ctx.fill();
     ctx.strokeStyle = 'rgba(15, 23, 42, 0.55)';
@@ -203,46 +197,46 @@ function drawCastOcclusionShadows(ctx, conePoly, ox, oy, range) {
   }
 }
 
-function drawJammedBrokenArc(ctx, cam) {
+function drawJammedBrokenArc(ctx, cc) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+  ctx.strokeStyle = 'rgba(34, 211, 238, 0.45)';
   ctx.lineWidth = 2;
   ctx.setLineDash([7, 8]);
   ctx.beginPath();
-  ctx.moveTo(cam.x, cam.y);
-  ctx.lineTo(cam.x + Math.cos(cam.angle - cam.fov * 0.5) * 105, cam.y + Math.sin(cam.angle - cam.fov * 0.5) * 105);
-  ctx.moveTo(cam.x, cam.y);
-  ctx.lineTo(cam.x + Math.cos(cam.angle + cam.fov * 0.5) * 105, cam.y + Math.sin(cam.angle + cam.fov * 0.5) * 105);
+  ctx.moveTo(cc.x, cc.y);
+  ctx.lineTo(cc.x + Math.cos(cc.angle - cc.fov * 0.5) * 102, cc.y + Math.sin(cc.angle - cc.fov * 0.5) * 102);
+  ctx.moveTo(cc.x, cc.y);
+  ctx.lineTo(cc.x + Math.cos(cc.angle + cc.fov * 0.5) * 102, cc.y + Math.sin(cc.angle + cc.fov * 0.5) * 102);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cam.x, cam.y, 105, cam.angle - cam.fov * 0.5, cam.angle + cam.fov * 0.5);
+  ctx.arc(cc.x, cc.y, 102, cc.angle - cc.fov * 0.5, cc.angle + cc.fov * 0.5);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 }
 
-function drawArchitecturalPatrolHairlines(ctx, guards) {
+function drawPatrolTrackHairlines(ctx, guards) {
   for (const g of guards) {
     const pts = g.waypoints;
     if (pts.length < 2) continue;
-    ctx.strokeStyle = 'rgba(248, 113, 113, 0.36)';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(255, 46, 76, 0.28)';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     pts.forEach((wp, i) => (i === 0 ? ctx.moveTo(wp.x, wp.y) : ctx.lineTo(wp.x, wp.y)));
     if (pts.length > 2) ctx.closePath();
     ctx.stroke();
 
-    const segCount = pts.length > 2 ? pts.length : pts.length - 1;
-    for (let i = 0; i < segCount; i++) {
+    for (let i = 0; i < pts.length; i++) {
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
+      if (i === pts.length - 1 && pts.length <= 2) continue;
       const mx = (a.x + b.x) * 0.5;
       const my = (a.y + b.y) * 0.5;
       const ang = Math.atan2(b.y - a.y, b.x - a.x);
       ctx.save();
       ctx.translate(mx, my);
       ctx.rotate(ang);
-      ctx.fillStyle = 'rgba(252, 165, 165, 0.8)';
+      ctx.fillStyle = 'rgba(255, 107, 129, 0.88)';
       ctx.beginPath();
       ctx.moveTo(6, 0);
       ctx.lineTo(-4, -4.5);
@@ -253,12 +247,12 @@ function drawArchitecturalPatrolHairlines(ctx, guards) {
     }
 
     for (const wp of pts) {
-      ctx.fillStyle = '#0D1522';
+      ctx.fillStyle = '#0D1018';
       ctx.beginPath();
-      ctx.arc(wp.x, wp.y, 3.8, 0, Math.PI * 2);
+      ctx.arc(wp.x, wp.y, 3.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(248, 113, 113, 0.75)';
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = 'rgba(255, 107, 129, 0.65)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
   }
@@ -267,25 +261,23 @@ function drawArchitecturalPatrolHairlines(ctx, guards) {
 function drawCoinLure(ctx, c) {
   ctx.save();
   if (Number.isFinite(c.fromX)) {
-    ctx.strokeStyle = 'rgba(251, 191, 36, 0.72)';
-    ctx.lineWidth = 2.2;
-    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([6, 5]);
     ctx.beginPath();
     ctx.moveTo(c.fromX, c.fromY);
-    ctx.quadraticCurveTo((c.fromX + c.x) * 0.5, Math.min(c.fromY, c.y) - 30, c.x, c.y);
+    ctx.quadraticCurveTo((c.fromX + c.x) * 0.5, Math.min(c.fromY, c.y) - 34, c.x, c.y);
     ctx.stroke();
     ctx.setLineDash([]);
   }
   for (let k = 0; k < 3; k++) {
-    const rr = 20 + k * 22;
-    const a = 0.92 - k * 0.24;
-    ctx.strokeStyle = `rgba(251, 191, 36, ${a.toFixed(2)})`;
+    ctx.strokeStyle = `rgba(250, 204, 21, ${(0.92 - k * 0.24).toFixed(2)})`;
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, rr, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, 20 + k * 21, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.fillStyle = '#FBBF24';
+  ctx.fillStyle = PALETTE.coinGold;
   ctx.beginPath();
   ctx.arc(c.x, c.y, 13, 0, Math.PI * 2);
   ctx.fill();
@@ -298,27 +290,18 @@ function drawCoinLure(ctx, c) {
   ctx.textBaseline = 'middle';
   ctx.fillText('$', c.x, c.y + 1);
 
-  ctx.font = `900 16px ${UI_FONT}`;
-  const tw = Math.ceil(ctx.measureText('COIN').width) + 22;
-  ctx.fillStyle = '#FBBF24';
-  ctx.fillRect(c.x - tw * 0.5, c.y + 19, tw, 27);
-  ctx.strokeStyle = '#FFFBEB';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(c.x - tw * 0.5, c.y + 19, tw, 27);
-  ctx.fillStyle = '#1A1002';
-  ctx.fillText('COIN', c.x, c.y + 33);
+  drawWorldBadge(ctx, c.x, c.y + 31, 'COIN', PALETTE.coinGold, '#1A1002', '#FFFBEB', 15);
   ctx.restore();
 }
 
 function drawEmpWave(ctx, w) {
   ctx.save();
   for (let k = 0; k < 3; k++) {
-    const rr = Math.max(22, w.radius - k * 24);
-    const alpha = Math.max(0.42, 0.95 - k * 0.22);
-    ctx.strokeStyle = `rgba(56, 189, 248, ${alpha.toFixed(2)})`;
-    ctx.lineWidth = k === 0 ? 3.8 : 2.6;
-    if (k === 1) ctx.setLineDash([8, 6]);
-    else ctx.setLineDash([]);
+    const rr = Math.max(18, w.radius - k * 28);
+    const alpha = Math.max(0.45, 0.96 - k * 0.22);
+    ctx.strokeStyle = `rgba(217, 70, 239, ${alpha.toFixed(2)})`;
+    ctx.lineWidth = k === 0 ? 4 : 2.8;
+    ctx.setLineDash(k % 2 === 1 ? [9, 6] : []);
     ctx.beginPath();
     ctx.arc(w.x, w.y, rr, 0, Math.PI * 2);
     ctx.stroke();
@@ -332,45 +315,18 @@ function drawChalkSmokeCloud(ctx, sm, time) {
   const fade = Math.min(1, sm.timer / 1.2);
   ctx.globalAlpha = 0.98 * fade;
 
-  const vapor = ctx.createRadialGradient(sm.x, sm.y, 8, sm.x, sm.y, sm.radius);
-  vapor.addColorStop(0, 'rgba(207, 250, 254, 0.78)');
-  vapor.addColorStop(0.55, 'rgba(103, 232, 249, 0.48)');
-  vapor.addColorStop(0.88, 'rgba(56, 189, 248, 0.24)');
-  vapor.addColorStop(1, 'rgba(56, 189, 248, 0.08)');
+  const vapor = ctx.createRadialGradient(sm.x, sm.y, 10, sm.x, sm.y, sm.radius);
+  vapor.addColorStop(0, 'rgba(248, 250, 252, 0.95)');
+  vapor.addColorStop(0.6, 'rgba(226, 232, 240, 0.78)');
+  vapor.addColorStop(0.88, 'rgba(203, 213, 225, 0.42)');
+  vapor.addColorStop(1, 'rgba(203, 213, 225, 0.12)');
   ctx.fillStyle = vapor;
   ctx.beginPath();
   ctx.arc(sm.x, sm.y, sm.radius, 0, Math.PI * 2);
   ctx.fill();
 
   const spin = time * 0.45;
-  const lobes = [
-    { a: spin, dist: sm.radius * 0.34, r: sm.radius * 0.54 },
-    { a: spin + 1.57, dist: sm.radius * 0.32, r: sm.radius * 0.48 },
-    { a: spin + 3.14, dist: sm.radius * 0.34, r: sm.radius * 0.5 },
-    { a: spin + 4.71, dist: sm.radius * 0.3, r: sm.radius * 0.46 },
-  ];
-  for (const lb of lobes) {
-    const lx = sm.x + Math.cos(lb.a) * lb.dist;
-    const ly = sm.y + Math.sin(lb.a) * lb.dist;
-    const lg = ctx.createRadialGradient(lx, ly, 4, lx, ly, lb.r);
-    lg.addColorStop(0, 'rgba(236, 254, 255, 0.55)');
-    lg.addColorStop(1, 'rgba(103, 232, 249, 0)');
-    ctx.fillStyle = lg;
-    ctx.beginPath();
-    ctx.arc(lx, ly, lb.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.strokeStyle = '#67E8F9';
-  ctx.lineWidth = 2.4;
-  for (let k = 0; k < 3; k++) {
-    const startA = spin + k * ((Math.PI * 2) / 3);
-    ctx.beginPath();
-    ctx.arc(sm.x, sm.y, sm.radius * (0.52 + k * 0.14), startA, startA + 1.25);
-    ctx.stroke();
-  }
-
-  ctx.strokeStyle = '#CFFAFE';
+  ctx.strokeStyle = '#FFFFFF';
   ctx.lineWidth = 2.6;
   ctx.setLineDash([8, 5]);
   ctx.beginPath();
@@ -378,18 +334,15 @@ function drawChalkSmokeCloud(ctx, sm, time) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.font = `900 17px ${UI_FONT}`;
-  const tw = Math.ceil(ctx.measureText('SMOKE').width) + 24;
-  ctx.fillStyle = '#67E8F9';
-  ctx.fillRect(sm.x - tw * 0.5, sm.y - 15.5, tw, 31);
-  ctx.strokeStyle = '#FFFFFF';
+  ctx.strokeStyle = '#94A3B8';
   ctx.lineWidth = 2.2;
-  ctx.strokeRect(sm.x - tw * 0.5, sm.y - 15.5, tw, 31);
-  ctx.fillStyle = '#062430';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('SMOKE', sm.x, sm.y + 0.5);
+  for (let k = 0; k < 3; k++) {
+    const a = spin + k * ((Math.PI * 2) / 3);
+    ctx.beginPath();
+    ctx.arc(sm.x, sm.y, sm.radius * (0.48 + k * 0.14), a, a + 1.2);
+    ctx.stroke();
+  }
+
+  drawWorldBadge(ctx, sm.x, sm.y, 'SMOKE', PALETTE.smokeWhite, PALETTE.hudInk, PALETTE.hudInk, 16);
   ctx.restore();
 }
-
-const UI_FONT = '"Segoe UI", system-ui, -apple-system, sans-serif';

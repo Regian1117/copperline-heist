@@ -1,4 +1,46 @@
-/* Procedural Web Audio API sound effects and alarm-scaled tension heartbeat. */
+export function updateTensionHeartbeat(alarm, minDist) {
+  const lock = arguments[2] || 0;
+  const ld = Boolean(arguments[3]);
+  const dt = arguments[4] || 0.016;
+  const normAlarm = alarm <= 1 ? alarm * 100 : alarm;
+  if (muted) return;
+
+  if (lock > 0.04) {
+    const tickRate = Math.max(0.08, 0.24 - lock * 0.15);
+    lockClock += dt;
+    if (lockClock >= tickRate) {
+      lockClock -= tickRate;
+      const ctx = ensureAudioContext();
+      if (ctx) {
+        const freq = 520 + lock * 680;
+        playTone(ctx, 'triangle', freq, freq * 1.15, 0.06, 0.055 + lock * 0.04, ctx.currentTime);
+      }
+    }
+  } else {
+    lockClock = 0;
+  }
+
+  const nearDanger = Number.isFinite(minDist) && minDist < 130;
+  if (normAlarm < 20 && !nearDanger && !ld) {
+    beatClock = 0;
+    return;
+  }
+  const tension = ld ? 82 : Math.max(normAlarm, nearDanger ? 35 : 0);
+  const interval = Math.max(0.38, 1.02 - ((tension - 20) / 80) * 0.62);
+  beatClock += dt;
+  if (beatClock >= interval) {
+    beatClock -= interval;
+    const ctx = ensureAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const gain = 0.04 + (tension / 100) * 0.065;
+    playTone(ctx, 'sine', 64, 42, 0.12, gain, now);
+    playTone(ctx, 'sine', 58, 38, 0.11, gain * 0.72, now + 0.14);
+    if (ld) {
+      playTone(ctx, 'sawtooth', 420, 310, 0.14, 0.032, now);
+    }
+  }
+}
 
 export function playHeistCue(kind) {
   if (muted) return;
@@ -23,6 +65,9 @@ export function playHeistCue(kind) {
     playTone(ctx, 'triangle', 440, 440, 0.18, 0.09, now);
     playTone(ctx, 'triangle', 554, 554, 0.22, 0.09, now + 0.08);
     playTone(ctx, 'triangle', 659, 659, 0.3, 0.1, now + 0.16);
+  } else if (kind === 'lockdown') {
+    playTone(ctx, 'sawtooth', 330, 520, 0.22, 0.085, now);
+    playTone(ctx, 'sawtooth', 520, 310, 0.26, 0.085, now + 0.22);
   } else if (kind === 'caught') {
     playTone(ctx, 'sawtooth', 196, 118, 0.42, 0.13, now);
     playTone(ctx, 'sawtooth', 148, 92, 0.48, 0.12, now + 0.06);
@@ -30,28 +75,12 @@ export function playHeistCue(kind) {
     [330, 415, 494, 659].forEach((freq, i) => {
       playTone(ctx, 'triangle', freq, freq * 1.01, 0.38, 0.085, now + i * 0.075);
     });
+  } else if (kind === 'zoom') {
+    playTone(ctx, 'sine', 520, 740, 0.08, 0.04, now);
   }
 }
 
-export function pulseTensionHeartbeat(ratio, dt = 0.016) {
-  const alarm = ratio <= 1 ? ratio * 100 : ratio;
-  if (muted || alarm < 25) {
-    beatClock = 0;
-    return;
-  }
-  const interval = Math.max(0.42, 1.05 - ((alarm - 25) / 75) * 0.62);
-  beatClock += dt;
-  if (beatClock >= interval) {
-    beatClock -= interval;
-    const ctx = ensureAudioContext();
-    if (!ctx) return;
-    const now = ctx.currentTime;
-    const gain = 0.045 + (alarm / 100) * 0.07;
-    playTone(ctx, 'sine', 64, 42, 0.12, gain, now);
-    playTone(ctx, 'sine', 58, 38, 0.11, gain * 0.72, now + 0.14);
-  }
-}
-
+/* Layered Web Audio synthesizer: cone proximity pulse, 0.75s lock-on ticks, lockdown siren, tool cues. */
 export function setAudioMuted(nextMuted) {
   muted = Boolean(nextMuted);
   return muted;
@@ -64,6 +93,7 @@ export function isAudioMuted() {
 let audioCtx = null;
 let muted = false;
 let beatClock = 0;
+let lockClock = 0;
 
 function ensureAudioContext() {
   if (typeof window === 'undefined') return null;

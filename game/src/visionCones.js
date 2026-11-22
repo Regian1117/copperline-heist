@@ -1,9 +1,7 @@
-/* Exact corner-raycasted vision cone clipping against walls, cover monoliths, and smoke clouds. */
-
-export function computeOccludedVisionCone(ox, oy, angle, fov, range, walls, smokes) {
-  const segs = walls || [];
-  const clouds = smokes || [];
-  const rays = 64;
+export function computeOccludedVisionCone(ox,oy,a,fov,rng,w,s){
+  const segs = w || [];
+  const clouds = s || [];
+  const rays = 68;
   const offsets = [];
 
   for (let i = 0; i <= rays; i++) {
@@ -11,26 +9,26 @@ export function computeOccludedVisionCone(ox, oy, angle, fov, range, walls, smok
   }
 
   for (let i = 0; i < segs.length; i++) {
-    const s = segs[i];
-    addCornerOffsets(ox, oy, angle, fov, range, s.x1, s.y1, offsets);
-    addCornerOffsets(ox, oy, angle, fov, range, s.x2, s.y2, offsets);
+    const seg = segs[i];
+    addCornerOffsets(ox, oy, a, fov, rng, seg.x1, seg.y1, offsets);
+    addCornerOffsets(ox, oy, a, fov, rng, seg.x2, seg.y2, offsets);
   }
 
   for (let i = 0; i < clouds.length; i++) {
     const sm = clouds[i];
     if (sm.timer <= 0) continue;
     const dist = Math.hypot(sm.x - ox, sm.y - oy);
-    if (dist > sm.radius + 1 && dist - sm.radius <= range) {
+    if (dist > sm.radius + 1 && dist - sm.radius <= rng) {
       const centerAng = Math.atan2(sm.y - oy, sm.x - ox);
       const tangentSpread = Math.asin(Math.min(0.999, sm.radius / dist));
-      addAngleIfInside(centerAng - tangentSpread - 0.002, angle, fov, offsets);
-      addAngleIfInside(centerAng - tangentSpread + 0.002, angle, fov, offsets);
-      addAngleIfInside(centerAng + tangentSpread - 0.002, angle, fov, offsets);
-      addAngleIfInside(centerAng + tangentSpread + 0.002, angle, fov, offsets);
+      addAngleIfInside(centerAng - tangentSpread - 0.002, a, fov, offsets);
+      addAngleIfInside(centerAng - tangentSpread + 0.002, a, fov, offsets);
+      addAngleIfInside(centerAng + tangentSpread - 0.002, a, fov, offsets);
+      addAngleIfInside(centerAng + tangentSpread + 0.002, a, fov, offsets);
     }
   }
 
-  offsets.sort((a, b) => a - b);
+  offsets.sort((p, q) => p - q);
 
   const points = [{ x: ox, y: oy, clipped: false, farX: ox, farY: oy }];
   let prev = -Infinity;
@@ -38,36 +36,37 @@ export function computeOccludedVisionCone(ox, oy, angle, fov, range, walls, smok
     const off = offsets[i];
     if (off - prev < 1e-4) continue;
     prev = off;
-    const ang = angle + off;
+    const ang = a + off;
     const dx = Math.cos(ang);
     const dy = Math.sin(ang);
-    const hitDist = castRayDistance(ox, oy, dx, dy, range, segs, clouds);
+    const hitDist = castRayDistance(ox, oy, dx, dy, rng, segs, clouds);
     points.push({
       x: ox + dx * hitDist,
       y: oy + dy * hitDist,
-      clipped: hitDist < range - 3,
-      farX: ox + dx * range,
-      farY: oy + dy * range,
+      clipped: hitDist < rng - 3,
+      farX: ox + dx * rng,
+      farY: oy + dy * rng,
     });
   }
   return points;
 }
 
-export function testPointInVisionCone(px, py, ox, oy, angle, fov, range, walls, smokes) {
-  const clouds = smokes || [];
+export function testPointInVisionCone(px,py,ox,oy,a,fov,rng,w,s){
+  const clouds = s || [];
   const dx = px - ox;
   const dy = py - oy;
   const dist = Math.hypot(dx, dy);
-  if (dist > range || dist < 1) return false;
+  if (dist > rng || dist < 1) return false;
   const targetAngle = Math.atan2(dy, dx);
-  const diff = normalizeAngle(targetAngle - angle);
+  const diff = normalizeAngle(targetAngle - a);
   if (Math.abs(diff) > fov) return false;
   const ux = dx / dist;
   const uy = dy / dist;
-  const visibleDist = castRayDistance(ox, oy, ux, uy, dist, walls || [], clouds);
+  const visibleDist = castRayDistance(ox, oy, ux, uy, dist, w || [], clouds);
   return visibleDist >= dist - 4;
 }
 
+/* Exact corner-raycasted occlusion helpers against solid walls, cover plinths, and smoke clouds. */
 export function normalizeAngle(a) {
   let r = a;
   while (r > Math.PI) r -= Math.PI * 2;
