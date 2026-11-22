@@ -1,134 +1,227 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-import { stageShot } from './shots.js';
+/* COPPERLINE entry point: responsive canvas bootstrap, game loop, and lazy preview shot loader. */
 
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
+import { COPPERLINE_FLOORS, WORLD_H, WORLD_W, buildMultiRouteFloor } from './floors.js';
+import { computeOccludedVisionCone } from './visionCones.js';
+import { resolveGuardAlertness, stepGuardPatrols } from './guards.js';
+import { stepLaserGridsAndRelays, stepSweepingCameras } from './camerasAndLasers.js';
+import { deployPaidTool, stepToolEffects } from './toolsAndEconomy.js';
+import { updateAlarmAndSuspicion } from './alarmAndGetaway.js';
+import { moveThiefThroughCover, readKeyboardAndMouseControls } from './thiefControls.js';
+import { renderConesAndActors, renderHeistArena } from './sceneRenderer.js';
+import { renderHighOcrHud, renderOutcomeOverlay } from './hudRenderer.js';
+import { isAudioMuted, playHeistCue, pulseTensionHeartbeat, setAudioMuted } from './heistAudio.js';
 
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
+let activeState = null;
 
-const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
+export async function startCopperlineHeist() {
+  const canvas = document.getElementById('heist-canvas');
+  const statusEl = document.getElementById('status');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const hitBoxes = [];
 
-function readBest() {
-  try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
-  } catch {
-    return 0;
-  }
-}
+  const params = new URLSearchParams(window.location.search);
+  const shotName = params.get('shot');
+  const seed = Number(params.get('seed')) || 7;
 
-function saveBest(value) {
-  try {
-    window.localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
-  }
-}
-
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
-}
-
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
-
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
+  if (shotName) {
+    const mod = await import('./previewScenarios.js');
+    activeState = mod.stageDeterministicHeistShot(shotName, seed);
+    const drawStatic = () => {
+      const layout = computeLayout(canvas);
+      renderFrame(ctx, activeState, layout, hitBoxes, null);
+    };
+    drawStatic();
+    window.addEventListener('resize', drawStatic);
+    announce(statusEl, `COPPERLINE ${activeState.code} ${activeState.alarmState}`);
+    return;
   }
 
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
-  }
+  activeState = buildMultiRouteFloor(0);
+  switchHeistScreen(activeState, 'title');
+  primeCones(activeState);
 
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
-    }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
-    }
-  }
-
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
+  let layout = computeLayout(canvas);
+  const controls = readKeyboardAndMouseControls(canvas, () => layout, {
+    onToolKey(toolIdx, pointer) {
+      if (activeState.screen !== 'playing' || activeState.paused) return;
+      const tx = pointer.insideArena ? pointer.worldX : NaN;
+      const ty = pointer.insideArena ? pointer.worldY : NaN;
+      deployPaidTool(activeState, toolIdx, tx, ty, playHeistCue);
+    },
+    onToggleRoutes() {
+      activeState.showRoutes = !activeState.showRoutes;
+    },
+    onTogglePause() {
+      if (activeState.screen === 'playing') activeState.paused = !activeState.paused;
+    },
+    onRetry() {
+      if (activeState.screen === 'playing' || activeState.screen === 'caught' || activeState.screen === 'getaway') {
+        activeState = buildMultiRouteFloor(activeState.floorIndex);
+        primeCones(activeState);
+        announce(statusEl, `Retrying ${activeState.code} ${activeState.name}`);
       }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
+    },
+    onToggleMute() {
+      const m = setAudioMuted(!isAudioMuted());
+      announce(statusEl, m ? 'Audio muted' : 'Audio enabled');
+    },
+    onPrimaryConfirm() {
+      if (activeState.screen === 'title') {
+        switchHeistScreen(activeState, 'playing');
+      } else if (activeState.screen === 'caught') {
+        activeState = buildMultiRouteFloor(activeState.floorIndex);
+        primeCones(activeState);
+      } else if (activeState.screen === 'getaway') {
+        const nextIdx = (activeState.floorIndex + 1) % COPPERLINE_FLOORS.length;
+        activeState = buildMultiRouteFloor(nextIdx);
+        primeCones(activeState);
+      }
+    },
+    onSpacePress() {
+      if (activeState.screen === 'title') switchHeistScreen(activeState, 'playing');
+    },
+    onCanvasClick(sx, sy, wx, wy, insideArena) {
+      const hit = hitBoxes.find((b) => sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h);
+      if (hit) {
+        handleHitBox(hit, statusEl);
+        return;
+      }
+      if (activeState.screen === 'playing' && !activeState.paused && insideArena) {
+        deployPaidTool(activeState, activeState.selectedTool, wx, wy, playHeistCue);
+      }
+    },
   });
 
-  announce('Block Dodger. Press Space or click to start.');
-  requestAnimationFrame(frame);
+  let lastTs = performance.now();
+  const loop = (ts) => {
+    const dt = Math.min(0.05, Math.max(0.001, (ts - lastTs) / 1000));
+    lastTs = ts;
+    layout = computeLayout(canvas);
+
+    if (activeState.screen === 'title') {
+      activeState.time += dt;
+      stepGuardPatrols(activeState, dt);
+      stepSweepingCameras(activeState, dt);
+    } else if (activeState.screen === 'playing' && !activeState.paused) {
+      activeState.time += dt;
+      const moveVec = controls.getMoveVector();
+      const sneaking = controls.isSneaking();
+      const interacting = controls.isInteracting();
+
+      moveThiefThroughCover(activeState, moveVec, sneaking, dt);
+      stepGuardPatrols(activeState, dt);
+      const guardRes = resolveGuardAlertness(activeState, dt);
+      const camRes = stepSweepingCameras(activeState, dt);
+      const laserRes = stepLaserGridsAndRelays(activeState, dt, interacting);
+      if (laserRes.relayHacked) playHeistCue('bypass');
+      stepToolEffects(activeState, dt);
+
+      updateAlarmAndSuspicion(
+        activeState,
+        dt,
+        {
+          anySeeing: guardRes.anySeeing,
+          caughtBy: guardRes.caughtBy,
+          cameraSeeing: camRes.cameraSeeing,
+          caughtByCamera: camRes.caughtByCamera,
+          laserTripped: laserRes.laserTripped,
+        },
+        interacting,
+        playHeistCue,
+      );
+      pulseTensionHeartbeat(activeState.alarm, dt);
+    }
+
+    renderFrame(ctx, activeState, layout, hitBoxes, controls.pointer);
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
 }
 
-if (shot) runShot(shot);
-else runGame();
+export function switchHeistScreen(state, nextScreen) {
+  state.screen = nextScreen;
+  state.paused = false;
+  return state;
+}
+
+function handleHitBox(hit, statusEl) {
+  if (hit.type === 'start') {
+    switchHeistScreen(activeState, 'playing');
+    announce(statusEl, `Started ${activeState.code} ${activeState.name}`);
+  } else if (hit.type === 'floor') {
+    activeState = buildMultiRouteFloor(hit.index);
+    switchHeistScreen(activeState, 'title');
+    primeCones(activeState);
+  } else if (hit.type === 'retry') {
+    activeState = buildMultiRouteFloor(activeState.floorIndex);
+    primeCones(activeState);
+    announce(statusEl, `Retrying ${activeState.code}`);
+  } else if (hit.type === 'next') {
+    const nextIdx = (activeState.floorIndex + 1) % COPPERLINE_FLOORS.length;
+    activeState = buildMultiRouteFloor(nextIdx);
+    primeCones(activeState);
+    announce(statusEl, `Entered ${activeState.code}`);
+  } else if (hit.type === 'resume') {
+    activeState.paused = false;
+  } else if (hit.type === 'routes') {
+    activeState.showRoutes = !activeState.showRoutes;
+  } else if (hit.type === 'sneak') {
+    activeState.thief.sneaking = !activeState.thief.sneaking;
+  } else if (hit.type === 'tool') {
+    if (activeState.selectedTool === hit.index && activeState.screen === 'playing' && !activeState.paused) {
+      deployPaidTool(activeState, hit.index, NaN, NaN, playHeistCue);
+    } else {
+      activeState.selectedTool = hit.index;
+    }
+  }
+}
+
+function primeCones(state) {
+  for (const g of state.guards) {
+    g.conePoly = computeOccludedVisionCone(g.x, g.y, g.angle, g.fov * 0.5, g.range, state.wallSegments, state.smokes);
+  }
+  for (const c of state.cameras) {
+    c.conePoly = computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 38);
+  }
+}
+
+function computeLayout(canvas) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const vw = Math.max(320, window.innerWidth);
+  const vh = Math.max(320, window.innerHeight);
+  const targetW = Math.round(vw * dpr);
+  const targetH = Math.round(vh * dpr);
+  if (canvas.width !== targetW || canvas.height !== targetH) {
+    canvas.width = targetW;
+    canvas.height = targetH;
+  }
+  const topBarH = vh < 740 ? 60 : 66;
+  const bottomBarH = vh < 740 ? 66 : 74;
+  const padX = 22;
+  const padY = 20;
+  const availW = Math.max(200, vw - padX * 2);
+  const availH = Math.max(200, vh - topBarH - bottomBarH - padY * 2);
+  const worldScale = Math.min(availW / WORLD_W, availH / WORLD_H);
+  const drawW = WORLD_W * worldScale;
+  const drawH = WORLD_H * worldScale;
+  const worldX = (vw - drawW) * 0.5;
+  const worldY = topBarH + (vh - topBarH - bottomBarH - drawH) * 0.5;
+  return { dpr, vw, vh, topBarH, bottomBarH, worldX, worldY, worldScale, worldW: WORLD_W, worldH: WORLD_H };
+}
+
+function renderFrame(ctx, state, layout, hitBoxes, pointer) {
+  ctx.save();
+  ctx.setTransform(layout.dpr, 0, 0, layout.dpr, 0, 0);
+  renderHeistArena(ctx, state, layout);
+  renderConesAndActors(ctx, state, layout, pointer);
+  renderHighOcrHud(ctx, state, layout, hitBoxes);
+  renderOutcomeOverlay(ctx, state, layout, hitBoxes);
+  ctx.restore();
+}
+
+function announce(el, text) {
+  if (el) el.textContent = text;
+}
+
+startCopperlineHeist();
