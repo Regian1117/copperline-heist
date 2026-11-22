@@ -2,7 +2,7 @@ export function renderGetawayOverlay(ctx, state, hits) {
   const cam = state.cam;
   if (state.screen === 'title') drawTitleOverlay(ctx, state, cam, hits);
   else if (state.screen === 'caught') drawCaughtRibbon(ctx, state, cam, hits);
-  else if (state.screen === 'getaway') drawSideGetawayCard(ctx, state, cam, hits);
+  else if (state.screen === 'getaway' || state.screen === 'won') drawSideGetawayCard(ctx, state, cam, hits);
   else if (state.paused) drawPauseModal(ctx, cam, hits);
 }
 
@@ -42,68 +42,64 @@ function drawTitleOverlay(ctx, state, cam, hits) {
 
 function drawCaughtRibbon(ctx, state, cam, hits) {
   const { vw, vh, topBarH } = cam;
-  const rh = Math.round(vh * 0.14);
-  const ry = vh - rh - 12;
-  const rw = vw - 36;
-
+  const mw = Math.min(568, vw - 48), mh = 186, mx = Math.round((vw - mw) * 0.5), my = vh - mh - 18, cx = vw * 0.5;
   ctx.save();
-  ctx.strokeStyle = 'rgba(255, 46, 76, 0.45)';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(5, topBarH + 5, vw - 10, vh - topBarH - 10);
-  drawPanelBox(ctx, 18, ry, rw, rh, 10, PALETTE.hudObsidian, PALETTE.guardCone, 2.6);
+  ctx.strokeStyle = 'rgba(251, 113, 133, 0.45)'; ctx.lineWidth = 8;
+  ctx.strokeRect(4, topBarH + 4, vw - 8, vh - topBarH - 8);
+  drawPanelBox(ctx, mx, my, mw, mh, 12, 'rgba(9, 19, 34, 0.97)', '#FB7185', 3);
+  drawText(ctx, `SPOTTED BY ${state.caughtBy || 'GUARD 1'}`, cx, my + 34, 28, '#FFFFFF', 'center');
 
-  const msg = `CAUGHT BY ${state.caughtBy || 'GUARD 1'}`;
-  drawText(ctx, msg, 44, ry + rh * 0.5, 28, '#FFFFFF', 'left');
-  const bx = 64 + ctx.measureText(msg).width;
-  ctx.font = `900 16px ${UI_FONT}`;
-  const bw = Math.ceil(ctx.measureText('0.75s GRACE WINDOW EXCEEDED').width) + 24;
-  drawPanelBox(ctx, bx, ry + rh * 0.5 - 19, bw, 38, 6, PALETTE.coinGold, '#FFFBEB', 1.6, '0.75s GRACE WINDOW EXCEEDED', PALETTE.hudInk, 16);
+  const pillText = '0.75s GRACE WINDOW EXCEEDED';
+  const pw = Math.min(mw - 44, Math.ceil(measureTrackedWidth(ctx, pillText, 17, 1.6)) + 34);
+  drawPanelBox(ctx, cx - pw * 0.5, my + 60, pw, 38, 7, '#FBBF24', '#FEF08A', 1.8);
+  drawTrackedText(ctx, pillText, cx, my + 79.5, 17, '#07101F', 1.6, 'center', null);
 
-  const btnX = 18 + rw - 270;
-  const btnY = ry + (rh - 52) * 0.5;
-  drawPanelBox(ctx, btnX, btnY, 248, 52, 8, PALETTE.exitGreen, '#A7F3D0', 2, '[R] RETRY FLOOR', '#042219', 20);
-  hits.push({ id: 'retry', type: 'retry', x: btnX, y: btnY, w: 248, h: 52 });
+  const btnW = mw - 64;
+  drawPanelBox(ctx, cx - btnW * 0.5, my + 114, btnW, 52, 8, '#10B981', '#A7F3D0', 2.2, '[R] RETRY FLOOR', '#07101F', 22);
+  hits.push({ id: 'retry', type: 'retry', x: cx - btnW * 0.5, y: my + 114, w: btnW, h: 52 });
   ctx.restore();
 }
 
 function drawSideGetawayCard(ctx, state, cam, hits) {
   const { vw, vh, topBarH } = cam;
-  const p = state.payout || { loot: state.lootValue, tools: state.toolsSpent, ghostBonus: 4500, bonusLabel: 'ZERO-CAUGHT', toolsLabel: 'TOOLS USED', netTake: state.lootValue + 4500 - state.toolsSpent };
-  const cw = Math.min(378, Math.round(vw * 0.36));
-  const ch = 412;
-  const x = vw - cw - 14;
-  const cx = x + cw * 0.5;
-  const y = topBarH + Math.max(24, (vh - topBarH - ch) * 0.5);
+  const p = state.payout || { loot: state.lootValue, tools: state.toolsSpent, ghostBonus: 4500 };
+  const loot = p.loot || 0, spent = p.tools || 0, bonus = p.ghostBonus || 0, net = loot - spent + bonus;
+  const fmt = (n) => Math.abs(Math.round(n)).toLocaleString(), floorNum = (state.floorIndex || 0) + 1;
+  const rows = [['VAULT LOOT', `+$${fmt(loot)}`, '#FFFFFF'], ['TOOLS USED', `-$${fmt(spent)}`, '#FBBF24']];
+  if (bonus > 0) rows.push(['GHOST BONUS', `+$${fmt(bonus)}`, '#60A5FA']);
+
+  const cw = vw < 1140 ? 436 : 448, ch = 294 + rows.length * 46, x = vw - cw - 14, cx = x + cw * 0.5;
+  const sx = (wx) => cam.anchorX + (wx - cam.focusX) * cam.scale, sy = (wy) => cam.anchorY + (wy - cam.focusY) * cam.scale;
+  const exRight = Math.max(sx(state.exit.x + state.exit.w), sx(state.thief.x) + 26);
+  const exTop = Math.min(sy(state.exit.y), sy(state.thief.y) - 26), exBot = Math.max(sy(state.exit.y + state.exit.h), sy(state.thief.y) + 26);
+  let y = topBarH + Math.max(16, (vh - topBarH - ch) * 0.5);
+  if (exRight > x - 12) y = (exTop + exBot) * 0.5 < vh * 0.5 ? Math.min(vh - ch - 16, Math.max(y, exBot + 22)) : Math.max(topBarH + 14, Math.min(y, exTop - ch - 22));
 
   ctx.save();
-  drawPanelBox(ctx, x, y, cw, ch, 12, 'rgba(11, 18, 33, 0.97)', PALETTE.brass, 2.8);
-  const hdr = `${state.code} · ESCAPED`;
-  ctx.font = `900 17px ${UI_FONT}`;
-  const hw = Math.ceil(ctx.measureText(hdr).width) + 32;
-  drawPanelBox(ctx, cx - hw * 0.5, y + 20, hw, 34, 6, '#34D399', '#A7F3D0', 1.6, hdr, '#042219', 17);
+  drawPanelBox(ctx, x, y, cw, ch, 12, 'rgba(9, 19, 34, 0.97)', PALETTE.brass, 2.8);
+  const hdr = `FLOOR ${floorNum}/${FLOOR_COUNT} · VAULT CLEARED`;
+  ctx.font = `900 16px ${UI_FONT}`;
+  const hw = Math.min(cw - 36, Math.ceil(ctx.measureText(hdr).width) + 34);
+  drawPanelBox(ctx, cx - hw * 0.5, y + 18, hw, 34, 6, '#10B981', '#A7F3D0', 1.6, hdr, '#07101F', 16);
+  drawText(ctx, 'GETAWAY PAYOUT LEDGER', cx, y + 78, 22, '#FFFFFF', 'center');
+  ctx.fillStyle = 'rgba(212, 175, 55, 0.45)'; ctx.fillRect(x + 22, y + 98, cw - 44, 1.5);
 
-  const lx = x + 22;
-  const rx = x + cw - 22;
-  let ry = y + 98;
-  for (const [label, val, col] of [
-    ['VAULT LOOT', `+$${p.loot.toLocaleString()}`, '#F6EFE0'],
-    [p.toolsLabel || 'TOOLS USED', `-$${p.tools.toLocaleString()}`, '#FDE047'],
-    [p.bonusLabel || 'ZERO-CAUGHT', `+$${p.ghostBonus.toLocaleString()}`, '#60A5FA'],
-  ]) {
+  const lx = x + 22, rx = x + cw - 22;
+  let ry = y + 130;
+  for (const [label, val, col] of rows) {
     drawText(ctx, label, lx, ry, 18, '#E2E8F0', 'left');
-    drawTrackedRightText(ctx, val, rx, ry, 28, col, 1.2);
-    ry += 50;
+    drawTrackedText(ctx, val, rx, ry, 26, col, 1.2, 'right', '#05070B');
+    ry += 46;
   }
 
-  ctx.fillStyle = PALETTE.brass;
-  ctx.fillRect(lx, ry - 14, cw - 44, 2);
-  drawPanelBox(ctx, lx - 6, ry + 2, cw - 32, 58, 7, '#09241B', PALETTE.brass, 1.8);
-  drawText(ctx, 'NET HAUL', lx + 6, ry + 32, 20, '#D1FAE5', 'left');
-  drawTrackedRightText(ctx, `+$${p.netTake.toLocaleString()}`, rx - 4, ry + 32, 32, '#FFFFFF', 1.3);
+  ctx.fillStyle = PALETTE.brass; ctx.fillRect(lx, ry - 14, cw - 44, 2.5);
+  drawPanelBox(ctx, lx - 4, ry - 2, cw - 36, 62, 8, '#082F23', '#34D399', 2);
+  drawText(ctx, 'NET PAYOUT', lx + 10, ry + 29, 20, '#A7F3D0', 'left');
+  drawTrackedText(ctx, `${net < 0 ? '-' : '+'}$${fmt(net)}`, rx - 8, ry + 29, 30, '#FFFFFF', 1.3, 'right', '#041A12');
 
-  const cta = state.floorIndex === FLOOR_COUNT - 1 ? '[ENTER] REPLAY' : '[ENTER] NEXT FLOOR';
-  drawPanelBox(ctx, x + 22, y + ch - 74, cw - 44, 52, 8, PALETTE.exitGreen, '#A7F3D0', 2, cta, '#042219', 21);
-  hits.push({ id: 'next', type: 'next', x: x + 22, y: y + ch - 74, w: cw - 44, h: 52 });
+  const cta = state.floorIndex === FLOOR_COUNT - 1 ? 'PLAY AGAIN →' : 'NEXT FLOOR →';
+  drawPanelBox(ctx, x + 22, y + ch - 74, cw - 44, 54, 8, '#10B981', '#A7F3D0', 2.2, cta, '#07101F', 22);
+  hits.push({ id: 'next', type: 'next', x: x + 22, y: y + ch - 74, w: cw - 44, h: 54 });
   ctx.restore();
 }
 
@@ -129,21 +125,24 @@ function drawText(ctx, text, x, y, fs, color, align) {
   ctx.fillText(text, x, y);
 }
 
-function drawTrackedRightText(ctx, text, rightX, y, fs, color, tracking) {
+function measureTrackedWidth(ctx, text, fs, tracking) {
   ctx.font = `900 ${fs}px ${UI_FONT}`;
   const chars = [...text];
-  let x = rightX - chars.reduce((acc, ch, i) => acc + ctx.measureText(ch).width + (i < chars.length - 1 ? tracking : 0), 0);
+  return chars.reduce((acc, ch, i) => acc + ctx.measureText(ch).width + (i < chars.length - 1 ? tracking : 0), 0);
+}
+
+function drawTrackedText(ctx, text, x, y, fs, color, tracking, align, strokeCol) {
+  const w = measureTrackedWidth(ctx, text, fs, tracking);
+  let cx = align === 'right' ? x - w : align === 'center' ? x - w * 0.5 : x;
   ctx.save();
   ctx.fillStyle = color;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#05070B';
-  ctx.lineWidth = 2.6;
-  for (const ch of chars) {
-    ctx.strokeText(ch, x, y);
-    ctx.fillText(ch, x, y);
-    x += ctx.measureText(ch).width + tracking;
+  if (strokeCol) { ctx.lineJoin = 'round'; ctx.strokeStyle = strokeCol; ctx.lineWidth = 2.6; }
+  for (const ch of text) {
+    if (strokeCol) ctx.strokeText(ch, cx, y);
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + tracking;
   }
   ctx.restore();
 }
