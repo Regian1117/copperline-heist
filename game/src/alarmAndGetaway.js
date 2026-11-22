@@ -3,32 +3,32 @@
 import { alertGuardsToNoise } from './guards.js';
 import { pushFloatingTag } from './toolsAndEconomy.js';
 
-export const VAULT_CRACK_SECONDS = 0.72;
-
-export function updateAlarmAndSuspicion(state, dt, detection, holdingInteract, playCue) {
+export function updateAlarmAndSuspicion(s, dt, det, act, cue) {
+  const state = s;
+  const interact = act;
   const { thief, loot, exit } = state;
 
-  if (detection.caughtBy || detection.caughtByCamera) {
-    const culprit = detection.caughtBy ? detection.caughtBy.label : detection.caughtByCamera.id;
-    const src = detection.caughtBy || detection.caughtByCamera;
-    triggerCaughtState(state, culprit, { x: src.x, y: src.y }, playCue);
+  if (det.caughtBy || det.caughtByCamera) {
+    const culprit = det.caughtBy ? det.caughtBy.label : det.caughtByCamera.id;
+    const src = det.caughtBy || det.caughtByCamera;
+    triggerCaughtState(state, culprit, { x: src.x, y: src.y }, cue);
     return;
   }
 
-  if (detection.laserTripped) {
+  if (det.laserTripped) {
     state.alarm = Math.min(100, state.alarm + 52);
     state.peakAlarm = Math.max(state.peakAlarm, state.alarm);
     state.wasSpotted = true;
     alertGuardsToNoise(state, thief.x, thief.y, 420, 4.5);
     pushFloatingTag(state, thief.x, thief.y - 26, 'LASER TRIPPED!', '#FB7185');
     if (state.alarm >= 100) {
-      triggerCaughtState(state, 'LASER GRID', { x: detection.laserTripped.x1, y: detection.laserTripped.y1 }, playCue);
+      triggerCaughtState(state, 'LASER GRID', { x: det.laserTripped.x1, y: det.laserTripped.y1 }, cue);
       return;
     }
-    if (playCue) playCue('caught');
+    if (cue) cue('caught');
   }
 
-  if (detection.anySeeing || detection.cameraSeeing) {
+  if (det.anySeeing || det.cameraSeeing) {
     state.alarm = Math.min(99, state.alarm + dt * 62);
   } else {
     const investigating = state.guards.some((g) => g.state === 'INVESTIGATE');
@@ -48,7 +48,7 @@ export function updateAlarmAndSuspicion(state, dt, detection, holdingInteract, p
       thief.stepTimer = 0;
       state.ripples.push({ x: thief.x, y: thief.y, radius: 10, maxRadius: 88, alpha: 0.52, color: '#7DD3FC' });
       alertGuardsToNoise(state, thief.x, thief.y, 92, 2.2);
-      if (playCue) playCue('step');
+      if (cue) cue('step');
     }
   } else {
     thief.stepTimer = Math.min(thief.stepTimer, 0.2);
@@ -56,14 +56,14 @@ export function updateAlarmAndSuspicion(state, dt, detection, holdingInteract, p
 
   if (!thief.lootSecured) {
     const distLoot = Math.hypot(thief.x - loot.x, thief.y - loot.y);
-    if (distLoot <= 52 && holdingInteract) {
+    if (distLoot <= 52 && interact) {
       thief.crackProgress = Math.min(1, thief.crackProgress + dt / VAULT_CRACK_SECONDS);
       if (thief.crackProgress >= 1) {
         thief.lootSecured = true;
         thief.crackProgress = 1;
         state.ripples.push({ x: loot.x, y: loot.y, radius: 12, maxRadius: 115, alpha: 0.9, color: '#FFD166' });
         pushFloatingTag(state, loot.x, loot.y - 32, `LOOT +$${state.lootValue.toLocaleString()}`, '#FFD166');
-        if (playCue) playCue('vault');
+        if (cue) cue('vault');
       }
     } else {
       thief.crackProgress = Math.max(0, thief.crackProgress - dt * 1.4);
@@ -71,18 +71,21 @@ export function updateAlarmAndSuspicion(state, dt, detection, holdingInteract, p
   } else if (pointInRect(thief.x, thief.y, exit)) {
     state.screen = 'getaway';
     state.alarmState = state.alarm < 30 ? 'CLEAN' : 'ESCAPED';
-    state.payout = evaluateGetawayPayoff(state);
-    if (playCue) playCue('getaway');
+    state.payout = computeGetawayPayout(state);
+    if (cue) cue('getaway');
   }
 }
 
-export function evaluateGetawayPayoff(state) {
-  const loot = state.lootValue;
-  const tools = state.toolsSpent;
-  const ghostBonus = !state.wasSpotted && state.peakAlarm < 35 ? 4500 : state.peakAlarm < 65 ? 2000 : 0;
+export function computeGetawayPayout(s) {
+  const loot = s.lootValue;
+  const tools = s.toolsSpent;
+  const ghostBonus = !s.wasSpotted && s.peakAlarm < 35 ? 4500 : s.peakAlarm < 65 ? 2000 : 0;
   const netTake = loot + ghostBonus - tools;
   return { loot, tools, ghostBonus, netTake };
 }
+
+export const evaluateGetawayPayoff = computeGetawayPayout;
+export const VAULT_CRACK_SECONDS = 0.72;
 
 export function resolveAlarmWord(alarm, screen) {
   if (screen === 'caught') return 'CAUGHT';

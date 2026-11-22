@@ -2,10 +2,8 @@
 
 import { computeOccludedVisionCone, testPointInVisionCone } from './visionCones.js';
 
-export const CAMERA_LOCK_SECONDS = 0.55;
-
-export function stepSweepingCameras(state, dt) {
-  const { cameras, thief, wallSegments, smokes } = state;
+export function stepSweepingCameras(s, dt) {
+  const { cameras, thief, wallSegments, smokes } = s;
   let cameraSeeing = false;
   let caughtByCamera = null;
 
@@ -33,7 +31,7 @@ export function stepSweepingCameras(state, dt) {
       }
     }
 
-    cam.conePoly = computeOccludedVisionCone(cam.x, cam.y, cam.angle, cam.fov * 0.5, cam.range, wallSegments, smokes, 38);
+    cam.conePoly = computeOccludedVisionCone(cam.x, cam.y, cam.angle, cam.fov * 0.5, cam.range, wallSegments, smokes, 40);
 
     const dist = Math.hypot(thief.x - cam.x, thief.y - cam.y);
     const shielded = thief.inCover && dist > 72;
@@ -56,8 +54,8 @@ export function stepSweepingCameras(state, dt) {
   return { cameraSeeing, caughtByCamera };
 }
 
-export function stepLaserGridsAndRelays(state, dt, holdingInteract) {
-  const { lasers, thief } = state;
+export function stepLaserGridsAndRelays(s, dt) {
+  const { lasers, thief, holdingInteract } = s;
   let laserTripped = null;
   let relayHacked = null;
 
@@ -94,6 +92,8 @@ export function stepLaserGridsAndRelays(state, dt, holdingInteract) {
 
   return { laserTripped, relayHacked };
 }
+
+const CAMERA_LOCK_SECONDS = 0.55;
 
 function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
   const dx = x2 - x1;

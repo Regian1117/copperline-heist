@@ -1,17 +1,17 @@
-/* Guard vision cones, CCTV sweep cones with ray-clipped scan beams, acoustic ripples, EMP, and chalk smoke. */
+/* Guard vision cones, architectural patrol tracks, single-cone CCTV fans, acoustic ripples, EMP, smoke. */
 
-export function renderGuardVisionCones(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+export function renderGuardVisionCones(ctx, s, lay) {
+  const { worldX, worldY, worldScale } = lay;
   ctx.save();
   ctx.translate(worldX, worldY);
   ctx.scale(worldScale, worldScale);
 
-  drawPatrolTracks(ctx, state.guards);
-  for (const g of state.guards) {
+  drawArchitecturalPatrolHairlines(ctx, s.guards);
+  for (const g of s.guards) {
     if (!g.conePoly || g.conePoly.length < 3) continue;
     const hot = g.state === 'SPOTTED';
     const grad = ctx.createRadialGradient(g.x, g.y, 10, g.x, g.y, g.range);
-    grad.addColorStop(0, hot ? 'rgba(239, 68, 68, 0.48)' : 'rgba(239, 68, 68, 0.36)');
+    grad.addColorStop(0, hot ? 'rgba(239, 68, 68, 0.5)' : 'rgba(239, 68, 68, 0.36)');
     grad.addColorStop(0.72, hot ? 'rgba(220, 38, 38, 0.25)' : 'rgba(220, 38, 38, 0.16)');
     grad.addColorStop(1, 'rgba(185, 28, 28, 0.05)');
 
@@ -28,18 +28,18 @@ export function renderGuardVisionCones(ctx, state, layout) {
   ctx.restore();
 }
 
-export function renderCameraSweepCones(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+export function renderCameraSweepCones(ctx, s, lay) {
+  const { worldX, worldY, worldScale } = lay;
   ctx.save();
   ctx.translate(worldX, worldY);
   ctx.scale(worldScale, worldScale);
 
-  for (const cam of state.cameras) {
+  for (const cam of s.cameras) {
     if (cam.jammedTimer > 0 || !cam.conePoly || cam.conePoly.length < 3) continue;
     const grad = ctx.createRadialGradient(cam.x, cam.y, 8, cam.x, cam.y, cam.range);
     grad.addColorStop(0, 'rgba(34, 211, 238, 0.34)');
-    grad.addColorStop(0.75, 'rgba(6, 182, 212, 0.16)');
-    grad.addColorStop(1, 'rgba(6, 182, 212, 0.05)');
+    grad.addColorStop(0.74, 'rgba(6, 182, 212, 0.15)');
+    grad.addColorStop(1, 'rgba(6, 182, 212, 0.04)');
 
     ctx.beginPath();
     cam.conePoly.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
@@ -47,82 +47,82 @@ export function renderCameraSweepCones(ctx, state, layout) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.85)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.88)';
+    ctx.lineWidth = 2.1;
     ctx.stroke();
 
-    const rays = cam.conePoly.length - 1;
-    const norm = 0.5 + 0.34 * Math.sin(state.time * 4.5 + cam.blinkPhase);
-    const rayIdx = Math.max(1, Math.min(rays, Math.round(1 + norm * (rays - 1))));
-    const tip = cam.conePoly[rayIdx];
-    if (tip) {
-      ctx.strokeStyle = 'rgba(165, 243, 252, 0.78)';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(cam.x, cam.y);
-      ctx.lineTo(tip.x, tip.y);
-      ctx.stroke();
-    }
-
-    ctx.strokeStyle = 'rgba(34, 211, 238, 0.45)';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([4, 5]);
+    ctx.strokeStyle = 'rgba(103, 232, 249, 0.28)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([5, 7]);
     ctx.beginPath();
-    ctx.arc(cam.x, cam.y, 42, cam.minAngle, cam.maxAngle);
+    ctx.arc(cam.x, cam.y, cam.range + 10, cam.angle - cam.fov * 0.5, cam.angle + cam.fov * 0.5);
     ctx.stroke();
     ctx.setLineDash([]);
   }
   ctx.restore();
 }
 
-export function renderAcousticAndSmokeFields(ctx, state, layout) {
-  const { worldX, worldY, worldScale } = layout;
+export function renderAcousticAndSmokeFields(ctx, s, lay) {
+  const { worldX, worldY, worldScale } = lay;
   ctx.save();
   ctx.translate(worldX, worldY);
   ctx.scale(worldScale, worldScale);
 
-  for (const r of state.ripples) {
+  for (const r of s.ripples) {
     ctx.save();
     ctx.strokeStyle = r.color;
     ctx.globalAlpha = Math.max(0, Math.min(1, r.alpha));
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
     ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
 
-  for (const c of state.coins) {
-    drawCoinLure(ctx, c);
-  }
-  for (const w of state.empWaves) {
-    drawEmpWave(ctx, w);
-  }
-  for (const sm of state.smokes) {
-    drawChalkSmokeCloud(ctx, sm, state.time);
-  }
+  for (const c of s.coins) drawCoinLure(ctx, c);
+  for (const w of s.empWaves) drawEmpWave(ctx, w);
+  for (const sm of s.smokes) drawChalkSmokeCloud(ctx, sm, s.time);
   ctx.restore();
 }
 
-function drawPatrolTracks(ctx, guards) {
+function drawArchitecturalPatrolHairlines(ctx, guards) {
   for (const g of guards) {
-    if (g.waypoints.length < 2) continue;
-    ctx.strokeStyle = 'rgba(248, 113, 113, 0.5)';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([8, 7]);
+    const pts = g.waypoints;
+    if (pts.length < 2) continue;
+    ctx.strokeStyle = 'rgba(248, 113, 113, 0.36)';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    g.waypoints.forEach((wp, i) => (i === 0 ? ctx.moveTo(wp.x, wp.y) : ctx.lineTo(wp.x, wp.y)));
-    if (g.waypoints.length > 2) ctx.closePath();
+    pts.forEach((wp, i) => (i === 0 ? ctx.moveTo(wp.x, wp.y) : ctx.lineTo(wp.x, wp.y)));
+    if (pts.length > 2) ctx.closePath();
     ctx.stroke();
-    ctx.setLineDash([]);
 
-    for (const wp of g.waypoints) {
-      ctx.fillStyle = '#090D16';
+    const segCount = pts.length > 2 ? pts.length : pts.length - 1;
+    for (let i = 0; i < segCount; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const mx = (a.x + b.x) * 0.5;
+      const my = (a.y + b.y) * 0.5;
+      const ang = Math.atan2(b.y - a.y, b.x - a.x);
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.rotate(ang);
+      ctx.fillStyle = 'rgba(252, 165, 165, 0.8)';
       ctx.beginPath();
-      ctx.arc(wp.x, wp.y, 4, 0, Math.PI * 2);
+      ctx.moveTo(6, 0);
+      ctx.lineTo(-4, -4.5);
+      ctx.lineTo(-4, 4.5);
+      ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#F87171';
-      ctx.lineWidth = 1.8;
+      ctx.restore();
+    }
+
+    for (const wp of pts) {
+      ctx.fillStyle = '#0D1522';
+      ctx.beginPath();
+      ctx.arc(wp.x, wp.y, 3.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(248, 113, 113, 0.75)';
+      ctx.lineWidth = 1.6;
       ctx.stroke();
     }
   }
@@ -131,7 +131,7 @@ function drawPatrolTracks(ctx, guards) {
 function drawCoinLure(ctx, c) {
   ctx.save();
   if (Number.isFinite(c.fromX)) {
-    ctx.strokeStyle = 'rgba(255, 209, 102, 0.58)';
+    ctx.strokeStyle = 'rgba(245, 196, 81, 0.65)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
     ctx.beginPath();
@@ -141,23 +141,23 @@ function drawCoinLure(ctx, c) {
     ctx.setLineDash([]);
   }
   for (let k = 0; k < 3; k++) {
-    const rr = 16 + ((c.ripplePhase * 22 + k * 24) % 72);
-    const a = Math.max(0.14, 1 - rr / 84);
-    ctx.strokeStyle = `rgba(255, 209, 102, ${a.toFixed(2)})`;
-    ctx.lineWidth = 2.4;
+    const rr = 18 + ((c.ripplePhase * 22 + k * 24) % 74);
+    const a = Math.max(0.2, 1 - rr / 88);
+    ctx.strokeStyle = `rgba(245, 196, 81, ${a.toFixed(2)})`;
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
     ctx.arc(c.x, c.y, rr, 0, Math.PI * 2);
     ctx.stroke();
   }
-  ctx.fillStyle = '#FFD166';
+  ctx.fillStyle = '#F5C451';
   ctx.beginPath();
-  ctx.arc(c.x, c.y, 11, 0, Math.PI * 2);
+  ctx.arc(c.x, c.y, 12, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#FFFBEB';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = '#090D16';
-  ctx.font = '900 13px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = '#0A1220';
+  ctx.font = `900 14px ${UI_FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('$', c.x, c.y + 1);
@@ -166,17 +166,17 @@ function drawCoinLure(ctx, c) {
 
 function drawEmpWave(ctx, w) {
   ctx.save();
-  const alpha = Math.max(0.25, w.timer / w.maxTimer);
+  const alpha = Math.max(0.32, w.timer / w.maxTimer);
   ctx.strokeStyle = `rgba(34, 211, 238, ${alpha.toFixed(2)})`;
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 3.6;
   ctx.beginPath();
   ctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = `rgba(165, 243, 252, ${(alpha * 0.65).toFixed(2)})`;
+  ctx.strokeStyle = `rgba(165, 243, 252, ${(alpha * 0.72).toFixed(2)})`;
   ctx.lineWidth = 1.8;
   ctx.setLineDash([8, 6]);
   ctx.beginPath();
-  ctx.arc(w.x, w.y, Math.max(12, w.radius - 18), 0, Math.PI * 2);
+  ctx.arc(w.x, w.y, Math.max(12, w.radius - 20), 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
@@ -185,12 +185,12 @@ function drawEmpWave(ctx, w) {
 function drawChalkSmokeCloud(ctx, sm, time) {
   ctx.save();
   const fade = Math.min(1, sm.timer / 1.2);
-  ctx.globalAlpha = 0.94 * fade;
+  ctx.globalAlpha = 0.96 * fade;
 
   const vapor = ctx.createRadialGradient(sm.x, sm.y, 6, sm.x, sm.y, sm.radius);
-  vapor.addColorStop(0, 'rgba(226, 246, 250, 0.56)');
-  vapor.addColorStop(0.58, 'rgba(148, 210, 224, 0.34)');
-  vapor.addColorStop(0.88, 'rgba(56, 189, 248, 0.16)');
+  vapor.addColorStop(0, 'rgba(226, 250, 252, 0.62)');
+  vapor.addColorStop(0.56, 'rgba(103, 232, 249, 0.34)');
+  vapor.addColorStop(0.86, 'rgba(56, 189, 248, 0.16)');
   vapor.addColorStop(1, 'rgba(56, 189, 248, 0.04)');
   ctx.fillStyle = vapor;
   ctx.beginPath();
@@ -199,32 +199,33 @@ function drawChalkSmokeCloud(ctx, sm, time) {
 
   const spin = time * 0.45;
   const lobes = [
-    { a: spin, dist: sm.radius * 0.36, r: sm.radius * 0.48 },
-    { a: spin + 2.1, dist: sm.radius * 0.34, r: sm.radius * 0.44 },
-    { a: spin + 4.2, dist: sm.radius * 0.35, r: sm.radius * 0.42 },
+    { a: spin, dist: sm.radius * 0.34, r: sm.radius * 0.52 },
+    { a: spin + 1.57, dist: sm.radius * 0.32, r: sm.radius * 0.46 },
+    { a: spin + 3.14, dist: sm.radius * 0.34, r: sm.radius * 0.48 },
+    { a: spin + 4.71, dist: sm.radius * 0.3, r: sm.radius * 0.44 },
   ];
   for (const lb of lobes) {
     const lx = sm.x + Math.cos(lb.a) * lb.dist;
     const ly = sm.y + Math.sin(lb.a) * lb.dist;
     const lg = ctx.createRadialGradient(lx, ly, 4, lx, ly, lb.r);
-    lg.addColorStop(0, 'rgba(240, 249, 255, 0.38)');
-    lg.addColorStop(1, 'rgba(186, 230, 253, 0)');
+    lg.addColorStop(0, 'rgba(240, 253, 255, 0.42)');
+    lg.addColorStop(1, 'rgba(165, 243, 252, 0)');
     ctx.fillStyle = lg;
     ctx.beginPath();
     ctx.arc(lx, ly, lb.r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.strokeStyle = 'rgba(207, 250, 254, 0.72)';
+  ctx.strokeStyle = 'rgba(207, 250, 254, 0.78)';
   ctx.lineWidth = 2;
   for (let k = 0; k < 3; k++) {
     const startA = spin + k * ((Math.PI * 2) / 3);
     ctx.beginPath();
-    ctx.arc(sm.x, sm.y, sm.radius * (0.58 + k * 0.12), startA, startA + 1.15);
+    ctx.arc(sm.x, sm.y, sm.radius * (0.52 + k * 0.14), startA, startA + 1.2);
     ctx.stroke();
   }
 
-  ctx.strokeStyle = '#7DD3FC';
+  ctx.strokeStyle = '#67E8F9';
   ctx.lineWidth = 2.2;
   ctx.setLineDash([7, 5]);
   ctx.beginPath();
@@ -232,16 +233,18 @@ function drawChalkSmokeCloud(ctx, sm, time) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.font = '900 11px "Segoe UI", system-ui, sans-serif';
+  ctx.font = `900 12px ${UI_FONT}`;
   const tw = Math.ceil(ctx.measureText('SMOKE').width) + 16;
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(sm.x - tw * 0.5, sm.y - 10, tw, 20);
-  ctx.strokeStyle = '#7DD3FC';
+  ctx.fillStyle = '#0A1220';
+  ctx.fillRect(sm.x - tw * 0.5, sm.y - 11, tw, 22);
+  ctx.strokeStyle = '#67E8F9';
   ctx.lineWidth = 1.6;
-  ctx.strokeRect(sm.x - tw * 0.5, sm.y - 10, tw, 20);
-  ctx.fillStyle = '#E0F2FE';
+  ctx.strokeRect(sm.x - tw * 0.5, sm.y - 11, tw, 22);
+  ctx.fillStyle = '#ECFEFF';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('SMOKE', sm.x, sm.y + 0.5);
   ctx.restore();
 }
+
+const UI_FONT = '"Bahnschrift", "DIN Alternate", "Segoe UI", system-ui, sans-serif';

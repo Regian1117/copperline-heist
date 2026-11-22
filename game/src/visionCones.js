@@ -1,30 +1,33 @@
 /* Exact raycasted vision cone clipping against interior walls and deployed smoke clouds. */
 
-export function computeOccludedVisionCone(ox, oy, angle, halfFov, range, wallSegments, smokes = [], rayCount = 44) {
+export function computeOccludedVisionCone(ox, oy, a, f, r, w, sm) {
+  const smokes = sm || [];
+  const rays = 48;
   const points = [{ x: ox, y: oy }];
-  const start = angle - halfFov;
-  const span = halfFov * 2;
-  for (let i = 0; i <= rayCount; i++) {
-    const a = start + (span * i) / rayCount;
-    const dx = Math.cos(a);
-    const dy = Math.sin(a);
-    const hitDist = castRayDistance(ox, oy, dx, dy, range, wallSegments, smokes);
+  const start = a - f;
+  const span = f * 2;
+  for (let i = 0; i <= rays; i++) {
+    const ang = start + (span * i) / rays;
+    const dx = Math.cos(ang);
+    const dy = Math.sin(ang);
+    const hitDist = castRayDistance(ox, oy, dx, dy, r, w, smokes);
     points.push({ x: ox + dx * hitDist, y: oy + dy * hitDist });
   }
   return points;
 }
 
-export function testPointInVisionCone(px, py, ox, oy, angle, halfFov, range, wallSegments, smokes = []) {
+export function testPointInVisionCone(px, py, ox, oy, a, f, r, w, sm) {
+  const smokes = sm || [];
   const dx = px - ox;
   const dy = py - oy;
   const dist = Math.hypot(dx, dy);
-  if (dist > range || dist < 1) return false;
+  if (dist > r || dist < 1) return false;
   const targetAngle = Math.atan2(dy, dx);
-  const diff = normalizeAngle(targetAngle - angle);
-  if (Math.abs(diff) > halfFov) return false;
+  const diff = normalizeAngle(targetAngle - a);
+  if (Math.abs(diff) > f) return false;
   const ux = dx / dist;
   const uy = dy / dist;
-  const visibleDist = castRayDistance(ox, oy, ux, uy, dist, wallSegments, smokes);
+  const visibleDist = castRayDistance(ox, oy, ux, uy, dist, w, smokes);
   return visibleDist >= dist - 4;
 }
 

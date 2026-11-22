@@ -1,43 +1,40 @@
 /* Procedural Web Audio API sound effects and alarm-scaled tension heartbeat. */
 
-let audioCtx = null;
-let muted = false;
-let beatClock = 0;
-
-export function playHeistCue(cueName) {
+export function playHeistCue(kind) {
   if (muted) return;
   const ctx = ensureAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
 
-  if (cueName === 'step') {
+  if (kind === 'step') {
     playTone(ctx, 'triangle', 110, 68, 0.055, 0.04, now);
-  } else if (cueName === 'coin') {
+  } else if (kind === 'coin') {
     playTone(ctx, 'sine', 2480, 2240, 0.14, 0.08, now);
     playTone(ctx, 'sine', 3720, 3410, 0.18, 0.05, now + 0.03);
-  } else if (cueName === 'jammer') {
+  } else if (kind === 'jammer') {
     playTone(ctx, 'sawtooth', 760, 140, 0.34, 0.09, now);
     playTone(ctx, 'sine', 380, 95, 0.38, 0.08, now + 0.02);
-  } else if (cueName === 'smoke') {
+  } else if (kind === 'smoke') {
     playNoiseBurst(ctx, 0.42, 950, 0.075, now);
-  } else if (cueName === 'bypass') {
+  } else if (kind === 'bypass') {
     playTone(ctx, 'triangle', 540, 810, 0.11, 0.08, now);
     playTone(ctx, 'triangle', 810, 1180, 0.14, 0.08, now + 0.09);
-  } else if (cueName === 'vault') {
+  } else if (kind === 'vault') {
     playTone(ctx, 'triangle', 440, 440, 0.18, 0.09, now);
     playTone(ctx, 'triangle', 554, 554, 0.22, 0.09, now + 0.08);
     playTone(ctx, 'triangle', 659, 659, 0.3, 0.1, now + 0.16);
-  } else if (cueName === 'caught') {
+  } else if (kind === 'caught') {
     playTone(ctx, 'sawtooth', 196, 118, 0.42, 0.13, now);
     playTone(ctx, 'sawtooth', 148, 92, 0.48, 0.12, now + 0.06);
-  } else if (cueName === 'getaway') {
+  } else if (kind === 'getaway') {
     [330, 415, 494, 659].forEach((freq, i) => {
       playTone(ctx, 'triangle', freq, freq * 1.01, 0.38, 0.085, now + i * 0.075);
     });
   }
 }
 
-export function pulseTensionHeartbeat(alarm, dt) {
+export function pulseTensionHeartbeat(ratio, dt = 0.016) {
+  const alarm = ratio <= 1 ? ratio * 100 : ratio;
   if (muted || alarm < 25) {
     beatClock = 0;
     return;
@@ -63,6 +60,10 @@ export function setAudioMuted(nextMuted) {
 export function isAudioMuted() {
   return muted;
 }
+
+let audioCtx = null;
+let muted = false;
+let beatClock = 0;
 
 function ensureAudioContext() {
   if (typeof window === 'undefined') return null;

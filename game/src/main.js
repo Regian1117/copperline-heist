@@ -11,10 +11,8 @@ import { moveThiefThroughCover, readKeyboardAndMouseControls } from './thiefCont
 import { renderBlueprintFloor, renderLaserRelaysAndExit, renderWallsVentsAndCover } from './arenaRenderer.js';
 import { renderAcousticAndSmokeFields, renderCameraSweepCones, renderGuardVisionCones } from './coneRenderer.js';
 import { renderLootPedestal, renderPatrolGuardsAndAlert, renderThiefSilhouette } from './actorRenderer.js';
-import { renderHighOcrHud, renderOutcomeOverlay } from './hudRenderer.js';
+import { renderInstrumentHud, renderOutcomeOverlay } from './hudRenderer.js';
 import { isAudioMuted, playHeistCue, pulseTensionHeartbeat, setAudioMuted } from './heistAudio.js';
-
-let activeState = null;
 
 export async function startCopperlineHeist() {
   const canvas = document.getElementById('heist-canvas');
@@ -30,7 +28,7 @@ export async function startCopperlineHeist() {
   if (shotName) {
     window.__shotReady = false;
     const mod = await import('./previewScenarios.js');
-    activeState = mod.stageDeterministicHeistShot(shotName, seed);
+    activeState = mod.setupShowcaseFloorState(shotName, seed);
     const drawStatic = () => {
       const layout = computeLayout(canvas);
       renderFrame(ctx, activeState, layout, hitBoxes, null);
@@ -48,17 +46,16 @@ export async function startCopperlineHeist() {
     return;
   }
 
-  activeState = buildMultiRouteFloor(0);
-  switchHeistScreen(activeState, 'title');
-  primeCones(activeState);
-
+  activeState = initFloor(0, 'title');
   let layout = computeLayout(canvas);
+  let virtualHackTimer = 0;
+
   const controls = readKeyboardAndMouseControls(canvas, () => layout, {
     onToolKey(toolIdx, pointer) {
       if (activeState.screen !== 'playing' || activeState.paused) return;
       const tx = pointer.insideArena ? pointer.worldX : NaN;
       const ty = pointer.insideArena ? pointer.worldY : NaN;
-      deployPaidTool(activeState, toolIdx, tx, ty, playHeistCue);
+      deployPaidTool(activeState, toolIdx, tx, ty);
     },
     onToggleRoutes() {
       activeState.showRoutes = !activeState.showRoutes;
@@ -70,8 +67,7 @@ export async function startCopperlineHeist() {
     },
     onRetry() {
       if (activeState.screen === 'playing' || activeState.screen === 'caught' || activeState.screen === 'getaway') {
-        activeState = buildMultiRouteFloor(activeState.floorIndex);
-        primeCones(activeState);
+        activeState = initFloor(activeState.floorIndex, 'playing');
         announce(statusEl, `Retrying ${activeState.code} ${activeState.name}`);
       }
     },
@@ -83,12 +79,9 @@ export async function startCopperlineHeist() {
       if (activeState.screen === 'title') {
         switchHeistScreen(activeState, 'playing');
       } else if (activeState.screen === 'caught') {
-        activeState = buildMultiRouteFloor(activeState.floorIndex);
-        primeCones(activeState);
+        activeState = initFloor(activeState.floorIndex, 'playing');
       } else if (activeState.screen === 'getaway') {
-        const nextIdx = (activeState.floorIndex + 1) % COPPERLINE_FLOORS.length;
-        activeState = buildMultiRouteFloor(nextIdx);
-        primeCones(activeState);
+        activeState = initFloor((activeState.floorIndex + 1) % COPPERLINE_FLOORS.length, 'playing');
       }
     },
     onSpacePress() {
@@ -97,11 +90,12 @@ export async function startCopperlineHeist() {
     onCanvasClick(sx, sy, wx, wy, insideArena) {
       const hit = hitBoxes.find((b) => sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h);
       if (hit) {
-        handleHitBox(hit, statusEl);
+        if (hit.type === 'hack') virtualHackTimer = 0.8;
+        else handleHitBox(hit, statusEl);
         return;
       }
       if (activeState.screen === 'playing' && !activeState.paused && insideArena) {
-        deployPaidTool(activeState, activeState.selectedTool, wx, wy, playHeistCue);
+        deployPaidTool(activeState, activeState.selectedTool, wx, wy);
       }
     },
   });
@@ -118,15 +112,16 @@ export async function startCopperlineHeist() {
       stepSweepingCameras(activeState, dt);
     } else if (activeState.screen === 'playing' && !activeState.paused) {
       activeState.time += dt;
-      const moveVec = controls.getMoveVector();
-      const sneaking = controls.isSneaking();
-      const interacting = controls.isInteracting();
+      if (virtualHackTimer > 0) virtualHackTimer = Math.max(0, virtualHackTimer - dt);
+      const moveInput = controls.getMoveInput();
+      const interacting = controls.isInteracting() || virtualHackTimer > 0;
+      activeState.holdingInteract = interacting;
 
-      moveThiefThroughCover(activeState, moveVec, sneaking, dt);
+      moveThiefThroughCover(activeState, moveInput, dt);
       stepGuardPatrols(activeState, dt);
       const guardRes = resolveGuardAlertness(activeState, dt);
       const camRes = stepSweepingCameras(activeState, dt);
-      const laserRes = stepLaserGridsAndRelays(activeState, dt, interacting);
+      const laserRes = stepLaserGridsAndRelays(activeState, dt);
       if (laserRes.relayHacked) playHeistCue('bypass');
       stepToolEffects(activeState, dt);
 
@@ -152,10 +147,18 @@ export async function startCopperlineHeist() {
   requestAnimationFrame(loop);
 }
 
-export function switchHeistScreen(state, nextScreen) {
-  state.screen = nextScreen;
-  state.paused = false;
-  return state;
+export function switchHeistScreen(s, next) {
+  s.screen = next;
+  s.paused = false;
+  return s;
+}
+
+function initFloor(index, screen) {
+  const s = buildMultiRouteFloor(index);
+  s.playCue = playHeistCue;
+  switchHeistScreen(s, screen);
+  primeCones(s);
+  return s;
 }
 
 function handleHitBox(hit, statusEl) {
@@ -163,17 +166,12 @@ function handleHitBox(hit, statusEl) {
     switchHeistScreen(activeState, 'playing');
     announce(statusEl, `Started ${activeState.code} ${activeState.name}`);
   } else if (hit.type === 'floor') {
-    activeState = buildMultiRouteFloor(hit.index);
-    switchHeistScreen(activeState, 'title');
-    primeCones(activeState);
+    activeState = initFloor(hit.index, 'title');
   } else if (hit.type === 'retry') {
-    activeState = buildMultiRouteFloor(activeState.floorIndex);
-    primeCones(activeState);
+    activeState = initFloor(activeState.floorIndex, 'playing');
     announce(statusEl, `Retrying ${activeState.code}`);
   } else if (hit.type === 'next') {
-    const nextIdx = (activeState.floorIndex + 1) % COPPERLINE_FLOORS.length;
-    activeState = buildMultiRouteFloor(nextIdx);
-    primeCones(activeState);
+    activeState = initFloor((activeState.floorIndex + 1) % COPPERLINE_FLOORS.length, 'playing');
     announce(statusEl, `Entered ${activeState.code}`);
   } else if (hit.type === 'resume') {
     activeState.paused = false;
@@ -181,9 +179,12 @@ function handleHitBox(hit, statusEl) {
     activeState.showRoutes = !activeState.showRoutes;
   } else if (hit.type === 'sneak') {
     activeState.thief.sneaking = !activeState.thief.sneaking;
+  } else if (hit.type === 'mute') {
+    const m = setAudioMuted(!isAudioMuted());
+    announce(statusEl, m ? 'Audio muted' : 'Audio enabled');
   } else if (hit.type === 'tool') {
     if (activeState.selectedTool === hit.index && activeState.screen === 'playing' && !activeState.paused) {
-      deployPaidTool(activeState, hit.index, NaN, NaN, playHeistCue);
+      deployPaidTool(activeState, hit.index, NaN, NaN);
     } else {
       activeState.selectedTool = hit.index;
     }
@@ -195,7 +196,7 @@ function primeCones(state) {
     g.conePoly = computeOccludedVisionCone(g.x, g.y, g.angle, g.fov * 0.5, g.range, state.wallSegments, state.smokes);
   }
   for (const c of state.cameras) {
-    c.conePoly = computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 38);
+    c.conePoly = computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 40);
   }
 }
 
@@ -209,10 +210,10 @@ function computeLayout(canvas) {
     canvas.width = targetW;
     canvas.height = targetH;
   }
-  const topBarH = vh < 740 ? 62 : 70;
-  const bottomBarH = vh < 740 ? 68 : 78;
-  const padX = 22;
-  const padY = 18;
+  const topBarH = vh < 740 ? 60 : 66;
+  const bottomBarH = vh < 740 ? 64 : 72;
+  const padX = 24;
+  const padY = 20;
   const availW = Math.max(200, vw - padX * 2);
   const availH = Math.max(200, vh - topBarH - bottomBarH - padY * 2);
   const worldScale = Math.min(availW / WORLD_W, availH / WORLD_H);
@@ -224,6 +225,7 @@ function computeLayout(canvas) {
 }
 
 function renderFrame(ctx, state, layout, hitBoxes, pointer) {
+  state.pointer = pointer;
   ctx.save();
   ctx.setTransform(layout.dpr, 0, 0, layout.dpr, 0, 0);
   renderBlueprintFloor(ctx, state, layout);
@@ -234,8 +236,8 @@ function renderFrame(ctx, state, layout, hitBoxes, pointer) {
   renderGuardVisionCones(ctx, state, layout);
   renderAcousticAndSmokeFields(ctx, state, layout);
   renderPatrolGuardsAndAlert(ctx, state, layout);
-  renderThiefSilhouette(ctx, state, layout, pointer);
-  renderHighOcrHud(ctx, state, layout, hitBoxes);
+  renderThiefSilhouette(ctx, state, layout);
+  renderInstrumentHud(ctx, state, layout, hitBoxes);
   renderOutcomeOverlay(ctx, state, layout, hitBoxes);
   ctx.restore();
 }
@@ -244,4 +246,5 @@ function announce(el, text) {
   if (el) el.textContent = text;
 }
 
+let activeState = null;
 startCopperlineHeist();

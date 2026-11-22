@@ -2,6 +2,29 @@
 
 import { isThiefInSafeCover, resolveVentTraversal } from './routesAndCover.js';
 
+export const CONTROL_BINDINGS={move:'WASD',sneak:'Shift',relay:'E',routes:'Tab'};
+
+export function moveThiefThroughCover(s, input, dt) {
+  const { thief, walls, covers, vents } = s;
+  const sneaking = Boolean(input.sneaking);
+  thief.sneaking = sneaking;
+  const speed = sneaking ? THIEF_SNEAK_SPEED : THIEF_WALK_SPEED;
+  thief.vx = (input.mx || 0) * speed;
+  thief.vy = (input.my || 0) * speed;
+
+  if (Math.hypot(thief.vx, thief.vy) > 4) {
+    thief.angle = Math.atan2(thief.vy, thief.vx);
+  }
+
+  const stepX = resolveVentTraversal(thief.x + thief.vx * dt, thief.y, thief.radius, walls, vents, true);
+  const stepY = resolveVentTraversal(stepX.coord, thief.y + thief.vy * dt, thief.radius, walls, vents, false);
+
+  thief.x = Math.max(26, Math.min(s.width - 26, stepX.coord));
+  thief.y = Math.max(26, Math.min(s.height - 26, stepY.coord));
+  thief.inCover = isThiefInSafeCover(thief.x, thief.y, covers);
+  thief.inVent = stepY.inVent;
+}
+
 export const THIEF_WALK_SPEED = 186;
 export const THIEF_SNEAK_SPEED = 114;
 
@@ -59,7 +82,7 @@ export function readKeyboardAndMouseControls(canvas, getLayout, callbacks) {
   return {
     keys,
     pointer,
-    getMoveVector() {
+    getMoveInput() {
       let mx = 0;
       let my = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) my -= 1;
@@ -71,10 +94,7 @@ export function readKeyboardAndMouseControls(canvas, getLayout, callbacks) {
         mx /= len;
         my /= len;
       }
-      return { mx, my };
-    },
-    isSneaking() {
-      return keys.has('ShiftLeft') || keys.has('ShiftRight');
+      return { mx, my, sneaking: keys.has('ShiftLeft') || keys.has('ShiftRight') };
     },
     isInteracting() {
       return keys.has('KeyE') || keys.has('Space');
@@ -86,24 +106,4 @@ export function readKeyboardAndMouseControls(canvas, getLayout, callbacks) {
       canvas.removeEventListener('pointerdown', onPointerDown);
     },
   };
-}
-
-export function moveThiefThroughCover(state, moveVec, sneaking, dt) {
-  const { thief, walls, covers, vents } = state;
-  thief.sneaking = sneaking;
-  const speed = sneaking ? THIEF_SNEAK_SPEED : THIEF_WALK_SPEED;
-  thief.vx = moveVec.mx * speed;
-  thief.vy = moveVec.my * speed;
-
-  if (Math.hypot(thief.vx, thief.vy) > 4) {
-    thief.angle = Math.atan2(thief.vy, thief.vx);
-  }
-
-  const stepX = resolveVentTraversal(thief.x + thief.vx * dt, thief.y, thief.radius, walls, vents, true);
-  const stepY = resolveVentTraversal(stepX.coord, thief.y + thief.vy * dt, thief.radius, walls, vents, false);
-
-  thief.x = Math.max(26, Math.min(state.width - 26, stepX.coord));
-  thief.y = Math.max(26, Math.min(state.height - 26, stepY.coord));
-  thief.inCover = isThiefInSafeCover(thief.x, thief.y, covers);
-  thief.inVent = stepY.inVent;
 }

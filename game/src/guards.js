@@ -4,14 +4,14 @@ import { computeOccludedVisionCone, normalizeAngle, testPointInVisionCone } from
 
 export const GUARD_LOCK_GRACE_SECONDS = 0.45;
 
-export function stepGuardPatrols(state, dt) {
-  const { guards, wallSegments, smokes } = state;
+export function stepGuardPatrols(s, dt) {
+  const { guards, wallSegments, smokes } = s;
   for (const g of guards) {
     let dest = null;
     let moveSpeed = g.speed;
 
     if (g.state === 'SPOTTED') {
-      const look = Math.atan2(state.thief.y - g.y, state.thief.x - g.x);
+      const look = Math.atan2(s.thief.y - g.y, s.thief.x - g.x);
       g.angle = turnToward(g.angle, look, 7.2 * dt);
     } else if (g.state === 'INVESTIGATE' && g.investigateTarget) {
       dest = g.investigateTarget;
@@ -19,7 +19,7 @@ export function stepGuardPatrols(state, dt) {
       const dist = Math.hypot(dest.x - g.x, dest.y - g.y);
       if (dist < 18) {
         dest.timer -= dt;
-        g.angle = turnToward(g.angle, g.angle + Math.sin(state.time * 2.8) * 1.1, 2.2 * dt);
+        g.angle = turnToward(g.angle, g.angle + Math.sin(s.time * 2.8) * 1.1, 2.2 * dt);
         if (dest.timer <= 0) {
           g.investigateTarget = null;
           g.state = 'PATROL';

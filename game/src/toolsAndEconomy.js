@@ -2,16 +2,12 @@
 
 import { alertGuardsToNoise } from './guards.js';
 
-export const STARTING_PURSE = 1200;
+export const TOOL_COSTS={coin:150,jammer:400,smoke:300,bypass:250};
 
-export const TOOL_CATALOG = [
-  { id: 'coin', key: '1', label: 'COIN', cost: 150, priceTag: '-$150', color: '#FFD166', icon: 'coin' },
-  { id: 'jammer', key: '2', label: 'JAMMER', cost: 400, priceTag: '-$400', color: '#22D3EE', icon: 'emp' },
-  { id: 'smoke', key: '3', label: 'SMOKE', cost: 300, priceTag: '-$300', color: '#CBD5E1', icon: 'smoke' },
-  { id: 'bypass', key: '4', label: 'BYPASS', cost: 250, priceTag: '-$250', color: '#F59E0B', icon: 'wrench' },
-];
-
-export function deployPaidTool(state, toolIndex, targetX, targetY, playCue) {
+export function deployPaidTool(s, id, tx, ty) {
+  const state = s;
+  const playCue = state.playCue;
+  const toolIndex = typeof id === 'number' ? id : TOOL_CATALOG.findIndex((t) => t.id === id);
   const tool = TOOL_CATALOG[toolIndex];
   if (!tool || state.screen !== 'playing') return { ok: false, reason: 'inactive' };
   if (state.purse < tool.cost) {
@@ -20,7 +16,7 @@ export function deployPaidTool(state, toolIndex, targetX, targetY, playCue) {
   }
 
   state.selectedTool = toolIndex;
-  const aim = resolveToolTarget(state, tool.id, targetX, targetY);
+  const aim = resolveToolTarget(state, tool.id, tx, ty);
 
   if (tool.id === 'coin') {
     deductPurse(state, tool.cost);
@@ -58,13 +54,7 @@ export function deployPaidTool(state, toolIndex, targetX, targetY, playCue) {
 
   if (tool.id === 'smoke') {
     deductPurse(state, tool.cost);
-    state.smokes.push({
-      x: aim.x,
-      y: aim.y,
-      radius: 64,
-      timer: 6.0,
-      maxTimer: 6.0,
-    });
+    state.smokes.push({ x: aim.x, y: aim.y, radius: 58, timer: 6.0, maxTimer: 6.0 });
     pushFloatingTag(state, aim.x, aim.y - 30, `SMOKE ${tool.priceTag}`, '#E2E8F0');
     if (playCue) playCue('smoke');
     return { ok: true, tool: tool.id };
@@ -94,6 +84,15 @@ export function deployPaidTool(state, toolIndex, targetX, targetY, playCue) {
 
   return { ok: false, reason: 'unknown' };
 }
+
+export const STARTING_PURSE = 1200;
+
+export const TOOL_CATALOG = [
+  { id: 'coin', key: '1', label: 'COIN', cost: TOOL_COSTS.coin, priceTag: '-$150', color: '#FFD166', icon: 'coin' },
+  { id: 'jammer', key: '2', label: 'JAMMER', cost: TOOL_COSTS.jammer, priceTag: '-$400', color: '#22D3EE', icon: 'emp' },
+  { id: 'smoke', key: '3', label: 'SMOKE', cost: TOOL_COSTS.smoke, priceTag: '-$300', color: '#CBD5E1', icon: 'smoke' },
+  { id: 'bypass', key: '4', label: 'BYPASS', cost: TOOL_COSTS.bypass, priceTag: '-$250', color: '#F59E0B', icon: 'wrench' },
+];
 
 export function stepToolEffects(state, dt) {
   for (let i = state.ripples.length - 1; i >= 0; i--) {
@@ -161,10 +160,7 @@ function resolveToolTarget(state, toolId, tx, ty) {
 }
 
 function clampToWorld(x, y) {
-  return {
-    x: Math.max(34, Math.min(1006, x)),
-    y: Math.max(34, Math.min(526, y)),
-  };
+  return { x: Math.max(34, Math.min(1006, x)), y: Math.max(34, Math.min(526, y)) };
 }
 
 function findNearestActiveLaser(state, x, y, maxRange) {
