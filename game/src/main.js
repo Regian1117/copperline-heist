@@ -9,7 +9,12 @@ import { deployPaidTool, stepToolEffects } from './toolsAndEconomy.js';
 import { updateAlarmAndSuspicion } from './alarmAndGetaway.js';
 import { moveThiefThroughCover, readKeyboardAndMouseControls } from './thiefControls.js';
 import { renderBlueprintFloor, renderLaserRelaysAndExit, renderWallsVentsAndCover } from './arenaRenderer.js';
-import { renderAcousticAndSmokeFields, renderCameraSweepCones, renderGuardVisionCones } from './coneRenderer.js';
+import {
+  renderAcousticAndSmokeFields,
+  renderCameraSweepCones,
+  renderGuardVisionCones,
+  renderOcclusionCutRims,
+} from './coneRenderer.js';
 import { renderLootPedestal, renderPatrolGuardsAndAlert, renderThiefSilhouette } from './actorRenderer.js';
 import { renderInstrumentHud, renderOutcomeOverlay } from './hudRenderer.js';
 import { isAudioMuted, playHeistCue, pulseTensionHeartbeat, setAudioMuted } from './heistAudio.js';
@@ -196,7 +201,7 @@ function primeCones(state) {
     g.conePoly = computeOccludedVisionCone(g.x, g.y, g.angle, g.fov * 0.5, g.range, state.wallSegments, state.smokes);
   }
   for (const c of state.cameras) {
-    c.conePoly = computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 40);
+    c.conePoly = computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes);
   }
 }
 
@@ -210,10 +215,10 @@ function computeLayout(canvas) {
     canvas.width = targetW;
     canvas.height = targetH;
   }
-  const topBarH = vh < 740 ? 60 : 66;
-  const bottomBarH = vh < 740 ? 64 : 72;
+  const topBarH = vh < 740 ? 54 : vh < 790 ? 56 : 60;
+  const bottomBarH = vh < 740 ? 58 : vh < 790 ? 62 : 66;
   const padX = 24;
-  const padY = 20;
+  const padY = 18;
   const availW = Math.max(200, vw - padX * 2);
   const availH = Math.max(200, vh - topBarH - bottomBarH - padY * 2);
   const worldScale = Math.min(availW / WORLD_W, availH / WORLD_H);
@@ -229,11 +234,12 @@ function renderFrame(ctx, state, layout, hitBoxes, pointer) {
   ctx.save();
   ctx.setTransform(layout.dpr, 0, 0, layout.dpr, 0, 0);
   renderBlueprintFloor(ctx, state, layout);
-  renderWallsVentsAndCover(ctx, state, layout);
-  renderLaserRelaysAndExit(ctx, state, layout);
-  renderLootPedestal(ctx, state, layout);
   renderCameraSweepCones(ctx, state, layout);
   renderGuardVisionCones(ctx, state, layout);
+  renderWallsVentsAndCover(ctx, state, layout);
+  renderOcclusionCutRims(ctx, state, layout);
+  renderLaserRelaysAndExit(ctx, state, layout);
+  renderLootPedestal(ctx, state, layout);
   renderAcousticAndSmokeFields(ctx, state, layout);
   renderPatrolGuardsAndAlert(ctx, state, layout);
   renderThiefSilhouette(ctx, state, layout);

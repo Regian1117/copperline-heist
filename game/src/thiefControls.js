@@ -2,10 +2,10 @@
 
 import { isThiefInSafeCover, resolveVentTraversal } from './routesAndCover.js';
 
-export const CONTROL_BINDINGS={move:'WASD',sneak:'Shift',relay:'E',routes:'Tab'};
+export const CONTROL_BINDINGS={move:'WASD',sneak:'Shift',hack:'E',routes:'Tab',retry:'R'};
 
-export function moveThiefThroughCover(s, input, dt) {
-  const { thief, walls, covers, vents } = s;
+export function moveThiefThroughCover(state, input, dt) {
+  const { thief, walls, covers, vents } = state;
   const sneaking = Boolean(input.sneaking);
   thief.sneaking = sneaking;
   const speed = sneaking ? THIEF_SNEAK_SPEED : THIEF_WALK_SPEED;
@@ -19,8 +19,8 @@ export function moveThiefThroughCover(s, input, dt) {
   const stepX = resolveVentTraversal(thief.x + thief.vx * dt, thief.y, thief.radius, walls, vents, true);
   const stepY = resolveVentTraversal(stepX.coord, thief.y + thief.vy * dt, thief.radius, walls, vents, false);
 
-  thief.x = Math.max(26, Math.min(s.width - 26, stepX.coord));
-  thief.y = Math.max(26, Math.min(s.height - 26, stepY.coord));
+  thief.x = Math.max(26, Math.min(state.width - 26, stepX.coord));
+  thief.y = Math.max(26, Math.min(state.height - 26, stepY.coord));
   thief.inCover = isThiefInSafeCover(thief.x, thief.y, covers);
   thief.inVent = stepY.inVent;
 }

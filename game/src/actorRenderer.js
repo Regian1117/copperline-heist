@@ -1,10 +1,10 @@
-/* Gold-trimmed ivory thief silhouette, bullion vault pedestal, armored guards, and turret cameras. */
+/* High-contrast hooded thief silhouette, golden vault pedestal, armored guards, and turret cameras. */
 
 import { GUARD_LOCK_GRACE_SECONDS } from './guards.js';
 
-export function renderThiefSilhouette(ctx, s, lay) {
-  const { worldX, worldY, worldScale } = lay;
-  const { thief, time, pointer } = s;
+export function renderThiefSilhouette(ctx, state, layout) {
+  const { worldX, worldY, worldScale } = layout;
+  const { thief, time, pointer } = state;
 
   ctx.save();
   ctx.translate(worldX, worldY);
@@ -14,8 +14,8 @@ export function renderThiefSilhouette(ctx, s, lay) {
   ctx.translate(thief.x, thief.y);
 
   const halo = ctx.createRadialGradient(0, 0, 8, 0, 0, 44);
-  halo.addColorStop(0, 'rgba(248, 250, 252, 0.28)');
-  halo.addColorStop(0.5, 'rgba(245, 196, 81, 0.14)');
+  halo.addColorStop(0, 'rgba(255, 253, 247, 0.34)');
+  halo.addColorStop(0.52, 'rgba(245, 196, 81, 0.16)');
   halo.addColorStop(1, 'rgba(245, 196, 81, 0)');
   ctx.fillStyle = halo;
   ctx.beginPath();
@@ -23,14 +23,17 @@ export function renderThiefSilhouette(ctx, s, lay) {
   ctx.fill();
 
   if (thief.inCover) {
-    ctx.strokeStyle = 'rgba(45, 212, 191, 0.8)';
-    ctx.lineWidth = 2;
-    const br = 24 + Math.sin(time * 4) * 1;
-    drawMiniBrackets(ctx, -br, -br, br * 2, br * 2, 7);
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 2.4;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 26 + Math.sin(time * 4) * 1.1, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   ctx.rotate(thief.angle);
-  ctx.scale(1.34, 1.34);
+  ctx.scale(1.36, 1.36);
 
   ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
   ctx.shadowBlur = 9;
@@ -49,17 +52,17 @@ export function renderThiefSilhouette(ctx, s, lay) {
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  ctx.strokeStyle = '#F5C451';
+  ctx.strokeStyle = '#FFFDF7';
   ctx.lineWidth = 2.2;
   ctx.stroke();
 
   ctx.fillStyle = '#1E293B';
   ctx.fillRect(-11, 8, 9, 5);
-  ctx.strokeStyle = '#C8A45C';
+  ctx.strokeStyle = '#D4AF5A';
   ctx.lineWidth = 1.2;
   ctx.strokeRect(-11, 8, 9, 5);
 
-  ctx.fillStyle = '#F8FAFC';
+  ctx.fillStyle = '#FFFDF7';
   ctx.beginPath();
   ctx.moveTo(15, 0);
   ctx.lineTo(2, -9.5);
@@ -73,13 +76,13 @@ export function renderThiefSilhouette(ctx, s, lay) {
   ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  ctx.fillStyle = '#0A1220';
+  ctx.fillStyle = '#0891B2';
   ctx.beginPath();
-  ctx.arc(3, 0, 2.8, 0, Math.PI * 2);
+  ctx.arc(4, 0, 3.2, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = '#FDE68A';
-  ctx.lineWidth = 2.2;
+  ctx.strokeStyle = '#38BDF8';
+  ctx.lineWidth = 2.4;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(17, -4);
@@ -88,26 +91,29 @@ export function renderThiefSilhouette(ctx, s, lay) {
   ctx.stroke();
 
   if (thief.lootSecured) {
-    ctx.fillStyle = '#F5C451';
+    ctx.fillStyle = '#FBBF24';
+    ctx.strokeStyle = '#FFFBEB';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(-9, -4.5);
-    ctx.lineTo(-4, 0);
-    ctx.lineTo(-9, 4.5);
-    ctx.lineTo(-14, 0);
+    ctx.moveTo(-8, -7);
+    ctx.lineTo(-1, 0);
+    ctx.lineTo(-8, 7);
+    ctx.lineTo(-16, 0);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 
-  if (s.screen === 'playing' && pointer && pointer.insideArena) {
-    drawToolAimReticle(ctx, s.selectedTool, pointer.worldX, pointer.worldY);
+  if (state.screen === 'playing' && pointer && pointer.insideArena) {
+    drawToolAimReticle(ctx, state.selectedTool, pointer.worldX, pointer.worldY);
   }
   ctx.restore();
 }
 
-export function renderLootPedestal(ctx, s, lay) {
-  const { worldX, worldY, worldScale } = lay;
-  const { loot, thief, lootValue, time } = s;
+export function renderLootPedestal(ctx, state, layout) {
+  const { worldX, worldY, worldScale } = layout;
+  const { loot, thief, lootValue, time } = state;
   const x = loot.x;
   const y = loot.y;
 
@@ -136,7 +142,7 @@ export function renderLootPedestal(ctx, s, lay) {
   ctx.fill();
   ctx.shadowColor = 'transparent';
 
-  ctx.strokeStyle = '#C8A45C';
+  ctx.strokeStyle = '#D4AF5A';
   ctx.lineWidth = 2.6;
   drawOctagon(ctx, x, y, 33);
   ctx.stroke();
@@ -178,7 +184,7 @@ export function renderLootPedestal(ctx, s, lay) {
     ctx.lineTo(x + 9, y - 42 + bob);
     ctx.stroke();
 
-    drawBadge(ctx, x, y + 44, `$${lootValue.toLocaleString()}`, '#F5C451', '#0A1220', '#FFFBEB', 16);
+    drawBadge(ctx, x, y + 44, `$${lootValue.toLocaleString()}`, '#F5C451', '#080D1A', '#FFFBEB', 16);
 
     if (thief.crackProgress > 0) {
       ctx.strokeStyle = '#10B981';
@@ -188,20 +194,27 @@ export function renderLootPedestal(ctx, s, lay) {
       ctx.stroke();
     }
   } else {
-    drawBadge(ctx, x, y + 40, 'CLEARED', '#0A261C', '#34D399', '#10B981', 12);
+    ctx.fillStyle = '#070B13';
+    drawOctagon(ctx, x, y, 22);
+    ctx.fill();
+    ctx.strokeStyle = '#64748B';
+    ctx.lineWidth = 1.6;
+    drawOctagon(ctx, x, y, 22);
+    ctx.stroke();
+    drawBadge(ctx, x, y + 40, 'STOLEN', '#FBBF24', '#1A1002', '#FFFBEB', 13);
   }
   ctx.restore();
 }
 
-export function renderPatrolGuardsAndAlert(ctx, s, lay) {
-  const { worldX, worldY, worldScale } = lay;
+export function renderPatrolGuardsAndAlert(ctx, state, layout) {
+  const { worldX, worldY, worldScale } = layout;
   ctx.save();
   ctx.translate(worldX, worldY);
   ctx.scale(worldScale, worldScale);
 
-  drawTurretCameras(ctx, s.cameras, s.time);
-  drawArmoredGuards(ctx, s.guards);
-  drawFloatingTags(ctx, s.floatingTags);
+  drawTurretCameras(ctx, state.cameras, state.time);
+  drawArmoredGuards(ctx, state.guards);
+  drawFloatingTags(ctx, state.floatingTags);
 
   ctx.restore();
 }
@@ -222,7 +235,7 @@ function drawTurretCameras(ctx, cameras, time) {
     ctx.stroke();
 
     ctx.fillStyle = '#0B1220';
-    ctx.strokeStyle = jammed ? '#64748B' : '#22D3EE';
+    ctx.strokeStyle = jammed ? '#38BDF8' : '#22D3EE';
     ctx.lineWidth = 2.1;
     ctx.beginPath();
     ctx.moveTo(-6, -8);
@@ -236,7 +249,7 @@ function drawTurretCameras(ctx, cameras, time) {
     ctx.stroke();
 
     const blinkOn = Math.sin(cam.blinkPhase + time * 4) > 0;
-    ctx.fillStyle = jammed ? '#475569' : blinkOn ? '#67E8F9' : '#22D3EE';
+    ctx.fillStyle = jammed ? '#38BDF8' : blinkOn ? '#67E8F9' : '#22D3EE';
     ctx.beginPath();
     ctx.arc(13, 0, 3.5, 0, Math.PI * 2);
     ctx.fill();
@@ -245,7 +258,7 @@ function drawTurretCameras(ctx, cameras, time) {
     const ox = cam.labelOffsetX ?? 0;
     const oy = cam.labelOffsetY ?? -22;
     if (jammed) {
-      drawBadge(ctx, cam.x + ox, cam.y + oy, 'JAMMED', '#082F49', '#67E8F9', '#22D3EE', 12);
+      drawBadge(ctx, cam.x + ox, cam.y + oy, 'JAMMED', '#38BDF8', '#062430', '#FFFFFF', 16);
     } else {
       drawBadge(ctx, cam.x + ox, cam.y + oy, cam.id, '#0A1220', '#A5F3FC', '#0891B2', 11);
     }
@@ -272,11 +285,11 @@ function drawArmoredGuards(ctx, guards) {
     ctx.shadowColor = 'transparent';
     ctx.stroke();
 
-    ctx.fillStyle = '#C8A45C';
-    ctx.fillRect(6, 7, 13, 5);
+    ctx.fillStyle = '#D4AF5A';
+    ctx.fillRect(6, -2.5, 14, 5);
     ctx.fillStyle = '#FEF08A';
     ctx.beginPath();
-    ctx.arc(20, 9.5, 3, 0, Math.PI * 2);
+    ctx.arc(21, 0, 3.2, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#991B1B';
@@ -294,7 +307,7 @@ function drawArmoredGuards(ctx, guards) {
     ctx.restore();
 
     ctx.fillStyle = '#FEF2F2';
-    ctx.font = `900 12px ${UI_FONT}`;
+    ctx.font = `900 13px ${UI_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(g.id, 0, 1);
@@ -319,16 +332,26 @@ function drawArmoredGuards(ctx, guards) {
     }
 
     if (g.statusTag) {
-      drawBadge(ctx, 0, -32, g.statusTag, '#F5C451', '#0A1220', '#FFFBEB', 12);
+      const isSpot = g.statusTag.includes('!');
+      drawBadge(
+        ctx,
+        0,
+        -34,
+        g.statusTag,
+        isSpot ? '#EF4444' : '#FBBF24',
+        isSpot ? '#FFFFFF' : '#1A1002',
+        '#FFFBEB',
+        13,
+      );
     } else if (g.alertIcon) {
-      ctx.fillStyle = g.alertIcon === '!' ? '#EF4444' : '#F59E0B';
+      ctx.fillStyle = g.alertIcon === '!' ? '#EF4444' : '#FBBF24';
       ctx.beginPath();
       ctx.arc(0, -30, 12, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#FFFBEB';
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.fillStyle = '#0A1220';
+      ctx.fillStyle = g.alertIcon === '!' ? '#FFFFFF' : '#1A1002';
       ctx.font = `900 16px ${UI_FONT}`;
       ctx.fillText(g.alertIcon, 0, -29);
     }
@@ -348,7 +371,7 @@ function drawFloatingTags(ctx, tags) {
 function drawToolAimReticle(ctx, toolIndex, wx, wy) {
   const colors = ['#F5C451', '#22D3EE', '#67E8F9', '#F59E0B'];
   const radii = [56, 72, 54, 30];
-  const color = colors[toolIndex] || '#C8A45C';
+  const color = colors[toolIndex] || '#D4AF5A';
   const r = radii[toolIndex] || 42;
   ctx.save();
   ctx.strokeStyle = color;
@@ -376,23 +399,6 @@ function drawToolAimReticle(ctx, toolIndex, wx, wy) {
   ctx.lineTo(wx, wy + 14);
   ctx.stroke();
   ctx.restore();
-}
-
-function drawMiniBrackets(ctx, x, y, w, h, len) {
-  ctx.beginPath();
-  ctx.moveTo(x, y + len);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + len, y);
-  ctx.moveTo(x + w - len, y);
-  ctx.lineTo(x + w, y);
-  ctx.lineTo(x + w, y + len);
-  ctx.moveTo(x + w, y + h - len);
-  ctx.lineTo(x + w, y + h);
-  ctx.lineTo(x + w - len, y + h);
-  ctx.moveTo(x + len, y + h);
-  ctx.lineTo(x, y + h);
-  ctx.lineTo(x, y + h - len);
-  ctx.stroke();
 }
 
 function drawBadge(ctx, cx, cy, text, bg, fg, border, fontSize) {
@@ -440,4 +446,4 @@ function chamferRect(ctx, x, y, w, h, cut) {
   ctx.closePath();
 }
 
-const UI_FONT = '"Bahnschrift", "DIN Alternate", "Segoe UI", system-ui, sans-serif';
+const UI_FONT = '"Segoe UI", system-ui, -apple-system, sans-serif';

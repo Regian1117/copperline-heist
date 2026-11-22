@@ -12,7 +12,8 @@ export function buildMultiRouteFloor(floorIdx = 0) {
     { x: WORLD_W - WALL_THICK, y: 0, w: WALL_THICK, h: WORLD_H },
   ];
   const walls = [...perimeter, ...blueprint.interiorWalls.map((w) => ({ ...w }))];
-  const wallSegments = extractWallSegments(walls);
+  const covers = blueprint.covers.map((c) => ({ ...c }));
+  const wallSegments = [...extractRectSegments(walls), ...extractCoverCoreSegments(covers)];
 
   const guards = blueprint.guards.map((g) => {
     const wp0 = g.waypoints[0];
@@ -76,12 +77,13 @@ export function buildMultiRouteFloor(floorIdx = 0) {
     exit: { ...blueprint.exit },
     walls,
     wallSegments,
-    covers: blueprint.covers.map((c) => ({ ...c })),
+    covers,
     vents,
     lasers,
     guards,
     cameras,
     routeHints: blueprint.routeHints,
+    zoneLabels: blueprint.zoneLabels || [],
     thief: {
       x: blueprint.spawn.x,
       y: blueprint.spawn.y,
@@ -132,6 +134,11 @@ export const COPPERLINE_FLOORS = [
     spawn: { x: 96, y: 472 },
     loot: { x: 248, y: 146 },
     exit: { x: 878, y: 50, w: 108, h: 56 },
+    zoneLabels: [
+      { text: 'VAULT CHAMBER', x: 248, y: 54 },
+      { text: 'CENTRAL ATRIUM', x: 562, y: 52 },
+      { text: 'EAST CORRIDOR', x: 912, y: 520 },
+    ],
     interiorWalls: [
       { x: 350, y: 18, w: 20, h: 178 },
       { x: 18, y: 268, w: 146, h: 20 },
@@ -206,7 +213,7 @@ export const COPPERLINE_FLOORS = [
     ],
     routeHints: [
       {
-        label: 'VENT FLANK',
+        label: 'VENT ROUTE',
         pts: [
           { x: 96, y: 472 },
           { x: 54, y: 350 },
@@ -215,7 +222,7 @@ export const COPPERLINE_FLOORS = [
         ],
       },
       {
-        label: 'RELAY LINE',
+        label: 'RELAY HACK',
         pts: [
           { x: 248, y: 146 },
           { x: 564, y: 280 },
@@ -233,6 +240,11 @@ export const COPPERLINE_FLOORS = [
     spawn: { x: 88, y: 474 },
     loot: { x: 520, y: 274 },
     exit: { x: 878, y: 50, w: 108, h: 56 },
+    zoneLabels: [
+      { text: 'WEST WING', x: 108, y: 520 },
+      { text: 'VAULT CHAMBER', x: 520, y: 158 },
+      { text: 'EAST CORRIDOR', x: 916, y: 522 },
+    ],
     interiorWalls: [
       { x: 168, y: 86, w: 230, h: 18 },
       { x: 468, y: 86, w: 258, h: 18 },
@@ -247,7 +259,7 @@ export const COPPERLINE_FLOORS = [
       { x: 650, y: 454, w: 118, h: 18 },
     ],
     covers: [
-      { x: 232, y: 312, w: 72, h: 66 },
+      { x: 248, y: 318, w: 72, h: 66 },
       { x: 710, y: 122, w: 72, h: 62 },
       { x: 704, y: 372, w: 74, h: 62 },
       { x: 62, y: 336, w: 72, h: 66 },
@@ -324,7 +336,7 @@ export const COPPERLINE_FLOORS = [
     ],
     routeHints: [
       {
-        label: 'VENT BYPASS',
+        label: 'VENT ROUTE',
         pts: [
           { x: 88, y: 474 },
           { x: 98, y: 182 },
@@ -337,7 +349,7 @@ export const COPPERLINE_FLOORS = [
         label: 'VAULT APPROACH',
         pts: [
           { x: 88, y: 474 },
-          { x: 268, y: 345 },
+          { x: 284, y: 350 },
           { x: 520, y: 382 },
           { x: 520, y: 274 },
         ],
@@ -350,8 +362,13 @@ export const COPPERLINE_FLOORS = [
     name: 'Clockwork Vault',
     lootValue: 28000,
     spawn: { x: 84, y: 280 },
-    loot: { x: 816, y: 192 },
+    loot: { x: 834, y: 192 },
     exit: { x: 878, y: 454, w: 108, h: 56 },
+    zoneLabels: [
+      { text: 'WEST WING', x: 112, y: 522 },
+      { text: 'CENTRAL HUB', x: 515, y: 196 },
+      { text: 'VAULT CHAMBER', x: 834, y: 104 },
+    ],
     interiorWalls: [
       { x: 234, y: 118, w: 20, h: 214 },
       { x: 374, y: 18, w: 20, h: 176 },
@@ -361,10 +378,10 @@ export const COPPERLINE_FLOORS = [
       { x: 720, y: 346, w: 20, h: 196 },
     ],
     covers: [
-      { x: 136, y: 358, w: 72, h: 66 },
+      { x: 128, y: 364, w: 72, h: 66 },
       { x: 278, y: 148, w: 72, h: 62 },
-      { x: 608, y: 348, w: 74, h: 64 },
-      { x: 758, y: 422, w: 72, h: 62 },
+      { x: 604, y: 446, w: 74, h: 64 },
+      { x: 758, y: 430, w: 72, h: 62 },
     ],
     vents: [
       {
@@ -382,7 +399,7 @@ export const COPPERLINE_FLOORS = [
         y1: 260,
         x2: 730,
         y2: 346,
-        relay: { x: 668, y: 126 },
+        relay: { x: 664, y: 128 },
       },
     ],
     guards: [
@@ -392,20 +409,20 @@ export const COPPERLINE_FLOORS = [
         waypoints: [
           { x: 296, y: 458 },
           { x: 296, y: 258 },
-          { x: 418, y: 258 },
-          { x: 418, y: 458 },
+          { x: 424, y: 258 },
+          { x: 424, y: 458 },
         ],
         speed: 84,
         fov: 0.9,
-        range: 225,
+        range: 235,
       },
       {
         id: 'G2',
         label: 'GUARD 2',
         waypoints: [
           { x: 792, y: 168 },
-          { x: 956, y: 168 },
-          { x: 956, y: 388 },
+          { x: 966, y: 168 },
+          { x: 966, y: 388 },
           { x: 792, y: 388 },
         ],
         speed: 86,
@@ -437,22 +454,35 @@ export const COPPERLINE_FLOORS = [
     ],
     routeHints: [
       {
-        label: 'NORTH DUCT',
+        label: 'VENT ROUTE',
+        labelPos: { x: 618, y: 94 },
         pts: [
           { x: 84, y: 280 },
-          { x: 312, y: 178 },
+          { x: 314, y: 178 },
           { x: 446, y: 53 },
-          { x: 924, y: 53 },
-          { x: 856, y: 286 },
+          { x: 834, y: 53 },
+          { x: 834, y: 146 },
         ],
       },
       {
-        label: 'TOOLS BREACH',
+        label: 'RELAY HACK',
+        labelPos: { x: 528, y: 144 },
         pts: [
-          { x: 172, y: 390 },
-          { x: 644, y: 380 },
-          { x: 856, y: 286 },
-          { x: 932, y: 482 },
+          { x: 422, y: 224 },
+          { x: 526, y: 146 },
+          { x: 664, y: 128 },
+          { x: 730, y: 302 },
+          { x: 834, y: 192 },
+        ],
+      },
+      {
+        label: 'SOUTH FLANK',
+        labelPos: { x: 468, y: 516 },
+        pts: [
+          { x: 164, y: 396 },
+          { x: 468, y: 496 },
+          { x: 640, y: 478 },
+          { x: 730, y: 302 },
         ],
       },
     ],
@@ -465,6 +495,11 @@ export const COPPERLINE_FLOORS = [
     spawn: { x: 92, y: 472 },
     loot: { x: 520, y: 282 },
     exit: { x: 878, y: 50, w: 108, h: 56 },
+    zoneLabels: [
+      { text: 'WEST WING', x: 112, y: 522 },
+      { text: 'VAULT CHAMBER', x: 520, y: 166 },
+      { text: 'EAST CORRIDOR', x: 916, y: 522 },
+    ],
     interiorWalls: [
       { x: 266, y: 132, w: 20, h: 120 },
       { x: 266, y: 326, w: 20, h: 120 },
@@ -569,7 +604,7 @@ export const COPPERLINE_FLOORS = [
     ],
     routeHints: [
       {
-        label: 'SOUTH DUCT',
+        label: 'VENT ROUTE',
         pts: [
           { x: 92, y: 472 },
           { x: 194, y: 509 },
@@ -591,13 +626,31 @@ export const COPPERLINE_FLOORS = [
   },
 ];
 
-function extractWallSegments(walls) {
+function extractRectSegments(rects) {
   const segs = [];
-  for (const w of walls) {
+  for (const w of rects) {
     const x1 = w.x;
     const y1 = w.y;
     const x2 = w.x + w.w;
     const y2 = w.y + w.h;
+    segs.push(
+      { x1, y1, x2, y2: y1 },
+      { x1: x2, y1, x2, y2 },
+      { x1: x2, y1: y2, x2: x1, y2 },
+      { x1, y1: y2, x2: x1, y2: y1 },
+    );
+  }
+  return segs;
+}
+
+function extractCoverCoreSegments(covers) {
+  const segs = [];
+  for (const c of covers) {
+    const pad = 2;
+    const x1 = c.x + pad;
+    const y1 = c.y + pad;
+    const x2 = c.x + c.w - pad;
+    const y2 = c.y + c.h - pad;
     segs.push(
       { x1, y1, x2, y2: y1 },
       { x1: x2, y1, x2, y2 },

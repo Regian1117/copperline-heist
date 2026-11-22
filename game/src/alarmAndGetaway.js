@@ -3,9 +3,7 @@
 import { alertGuardsToNoise } from './guards.js';
 import { pushFloatingTag } from './toolsAndEconomy.js';
 
-export function updateAlarmAndSuspicion(s, dt, det, act, cue) {
-  const state = s;
-  const interact = act;
+export function updateAlarmAndSuspicion(state, dt, det, act, cue) {
   const { thief, loot, exit } = state;
 
   if (det.caughtBy || det.caughtByCamera) {
@@ -56,7 +54,7 @@ export function updateAlarmAndSuspicion(s, dt, det, act, cue) {
 
   if (!thief.lootSecured) {
     const distLoot = Math.hypot(thief.x - loot.x, thief.y - loot.y);
-    if (distLoot <= 52 && interact) {
+    if (distLoot <= 52 && act) {
       thief.crackProgress = Math.min(1, thief.crackProgress + dt / VAULT_CRACK_SECONDS);
       if (thief.crackProgress >= 1) {
         thief.lootSecured = true;
@@ -76,10 +74,10 @@ export function updateAlarmAndSuspicion(s, dt, det, act, cue) {
   }
 }
 
-export function computeGetawayPayout(s) {
-  const loot = s.lootValue;
-  const tools = s.toolsSpent;
-  const ghostBonus = !s.wasSpotted && s.peakAlarm < 35 ? 4500 : s.peakAlarm < 65 ? 2000 : 0;
+export function computeGetawayPayout(state) {
+  const loot = state.lootValue;
+  const tools = state.toolsSpent;
+  const ghostBonus = !state.wasSpotted && state.peakAlarm < 35 ? 4500 : state.peakAlarm < 65 ? 2000 : 0;
   const netTake = loot + ghostBonus - tools;
   return { loot, tools, ghostBonus, netTake };
 }

@@ -2,8 +2,8 @@
 
 import { computeOccludedVisionCone, testPointInVisionCone } from './visionCones.js';
 
-export function stepSweepingCameras(s, dt) {
-  const { cameras, thief, wallSegments, smokes } = s;
+export function stepSweepingCameras(state, dt) {
+  const { cameras, thief, wallSegments, smokes } = state;
   let cameraSeeing = false;
   let caughtByCamera = null;
 
@@ -31,7 +31,7 @@ export function stepSweepingCameras(s, dt) {
       }
     }
 
-    cam.conePoly = computeOccludedVisionCone(cam.x, cam.y, cam.angle, cam.fov * 0.5, cam.range, wallSegments, smokes, 40);
+    cam.conePoly = computeOccludedVisionCone(cam.x, cam.y, cam.angle, cam.fov * 0.5, cam.range, wallSegments, smokes);
 
     const dist = Math.hypot(thief.x - cam.x, thief.y - cam.y);
     const shielded = thief.inCover && dist > 72;
@@ -54,8 +54,8 @@ export function stepSweepingCameras(s, dt) {
   return { cameraSeeing, caughtByCamera };
 }
 
-export function stepLaserGridsAndRelays(s, dt) {
-  const { lasers, thief, holdingInteract } = s;
+export function stepLaserGridsAndRelays(state, dt) {
+  const { lasers, thief, holdingInteract } = state;
   let laserTripped = null;
   let relayHacked = null;
 

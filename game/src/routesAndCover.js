@@ -1,23 +1,26 @@
 /* Multi-route floor planning, TAB blueprint overlay paths, safe cover detection, and vent traversal. */
 
-export function computeFloorRoutes(s) {
+export function computeFloorRoutes(state) {
   const routes = [];
-  if (s.showRoutes) {
-    for (const hint of s.routeHints) {
+  if (state.showRoutes) {
+    for (let i = 0; i < state.routeHints.length; i++) {
+      const hint = state.routeHints[i];
       routes.push({
         label: hint.label,
-        color: 'rgba(224, 184, 106, 0.82)',
+        labelPos: hint.labelPos || null,
+        color: i === 0 ? 'rgba(45, 212, 191, 0.92)' : 'rgba(245, 196, 81, 0.92)',
         pts: hint.pts,
       });
     }
   }
-  if (s.thief.lootSecured && s.screen === 'playing') {
+  if (state.thief.lootSecured && state.screen === 'playing') {
     routes.push({
       label: 'GETAWAY',
-      color: 'rgba(16, 185, 129, 0.85)',
+      labelPos: null,
+      color: 'rgba(16, 185, 129, 0.9)',
       pts: [
-        { x: s.thief.x, y: s.thief.y },
-        { x: s.exit.x + s.exit.w * 0.5, y: s.exit.y + s.exit.h * 0.5 },
+        { x: state.thief.x, y: state.thief.y },
+        { x: state.exit.x + state.exit.w * 0.5, y: state.exit.y + state.exit.h * 0.5 },
       ],
     });
   }

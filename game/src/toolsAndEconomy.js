@@ -4,8 +4,7 @@ import { alertGuardsToNoise } from './guards.js';
 
 export const TOOL_COSTS={coin:150,jammer:400,smoke:300,bypass:250};
 
-export function deployPaidTool(s, id, tx, ty) {
-  const state = s;
+export function deployPaidTool(state, id, tx, ty) {
   const playCue = state.playCue;
   const toolIndex = typeof id === 'number' ? id : TOOL_CATALOG.findIndex((t) => t.id === id);
   const tool = TOOL_CATALOG[toolIndex];
@@ -134,6 +133,8 @@ export function pushFloatingTag(state, x, y, text, color) {
 function deductPurse(state, cost) {
   state.purse = Math.max(0, state.purse - cost);
   state.toolsSpent += cost;
+  if (!state.spentParts) state.spentParts = [];
+  state.spentParts.push(cost);
 }
 
 function resolveToolTarget(state, toolId, tx, ty) {
