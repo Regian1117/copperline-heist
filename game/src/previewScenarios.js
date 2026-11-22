@@ -1,4 +1,4 @@
-/* Deterministic heist state staging for automated ?shot=hero|tools|caught|getaway captures. */
+/* Compact deterministic shot staging for ?shot=hero|tools|caught|getaway captures. */
 
 import { evaluateGetawayPayoff } from './alarmAndGetaway.js';
 import { buildMultiRouteFloor } from './floors.js';
@@ -6,174 +6,60 @@ import { computeOccludedVisionCone } from './visionCones.js';
 
 export function stageDeterministicHeistShot(shotName, seed = 7) {
   const key = String(shotName || 'hero').toLowerCase();
+  const s = buildMultiRouteFloor(key === 'hero' ? 1 : key === 'tools' ? 2 : key === 'caught' ? 0 : 3);
+  s.time = 2.6 + (seed % 5) * 0.1;
 
   if (key === 'hero') {
-    const state = buildMultiRouteFloor(1);
-    state.screen = 'playing';
-    state.time = 2.4 + (seed % 5) * 0.1;
-    state.purse = 1200;
-    state.alarm = 36;
-    state.peakAlarm = 36;
-    state.alarmState = 'SUSPICIOUS';
-    state.selectedTool = 0;
-
-    state.thief.x = 326;
-    state.thief.y = 352;
-    state.thief.angle = -0.32;
-    state.thief.inCover = false;
-    state.thief.sneaking = true;
-
-    const g1 = state.guards[0];
-    g1.x = 466;
-    g1.y = 468;
-    g1.angle = -2.54;
-    g1.state = 'PATROL';
-    g1.lockTimer = 0.16;
-
-    const g2 = state.guards[1];
-    g2.x = 892;
-    g2.y = 492;
-    g2.angle = -1.64;
-    g2.range = 196;
-    g2.state = 'PATROL';
-
-    state.cameras[0].angle = 2.08;
-    state.cameras[1].angle = 0.04;
-    state.cameras[1].range = 178;
-
-    recomputeAllCones(state);
-    return state;
+    Object.assign(s, { screen: 'playing', purse: 1200, alarm: 36, peakAlarm: 36, alarmState: 'SUSPICIOUS', selectedTool: 0 });
+    Object.assign(s.thief, { x: 326, y: 344, angle: -0.28, inCover: false, sneaking: true });
+    Object.assign(s.guards[0], { x: 482, y: 468, angle: -2.24, fov: 0.84, range: 224, lockTimer: 0.16 });
+    Object.assign(s.guards[1], { x: 892, y: 488, angle: -1.68, range: 192 });
+    Object.assign(s.cameras[0], { x: 196, y: 114, labelOffsetY: 22, angle: 2.16, fov: 0.68, range: 204 });
+    Object.assign(s.cameras[1], { angle: 0.04, range: 174 });
+    return recomputeCones(s);
   }
 
   if (key === 'tools') {
-    const state = buildMultiRouteFloor(2);
-    state.screen = 'playing';
-    state.time = 4.2 + (seed % 5) * 0.1;
-    state.purse = 450;
-    state.toolsSpent = 750;
-    state.alarm = 14;
-    state.peakAlarm = 14;
-    state.alarmState = 'CALM';
-    state.selectedTool = 2;
-
-    state.thief.x = 176;
-    state.thief.y = 388;
-    state.thief.angle = 0.28;
-    state.thief.inCover = true;
-    state.thief.sneaking = true;
-
-    state.coins.push({ x: 332, y: 468, fromX: 176, fromY: 388, timer: 4.5, ripplePhase: 1.4 });
-
-    const g1 = state.guards[0];
-    g1.x = 304;
-    g1.y = 342;
-    g1.angle = 1.35;
-    g1.state = 'INVESTIGATE';
-    g1.alertIcon = '?';
-    g1.investigateTarget = { x: 332, y: 468, timer: 3.4 };
-
-    const g2 = state.guards[1];
-    g2.x = 962;
-    g2.y = 208;
-    g2.angle = 1.62;
-    g2.range = 198;
-    g2.state = 'PATROL';
-
-    state.cameras[0].jammedTimer = 5.4;
-    state.empWaves.push({ x: 258, y: 132, radius: 92, maxRadius: 140, timer: 0.9, maxTimer: 1.4 });
-
-    state.cameras[1].angle = -0.06;
-    state.cameras[1].fov = 0.78;
-    state.cameras[1].range = 242;
-    state.smokes.push({ x: 676, y: 214, radius: 46, timer: 5.2, maxTimer: 6.0 });
-
-    state.lasers[0].permanentlyDisabled = true;
-    state.lasers[0].active = false;
-
-    recomputeAllCones(state);
-    return state;
+    Object.assign(s, { screen: 'playing', purse: 450, toolsSpent: 750, alarm: 14, peakAlarm: 14, alarmState: 'CALM', selectedTool: 2 });
+    Object.assign(s.thief, { x: 176, y: 388, angle: 0.28, inCover: true, sneaking: true });
+    s.coins.push({ x: 332, y: 468, fromX: 176, fromY: 388, timer: 4.5, ripplePhase: 1.4 });
+    Object.assign(s.guards[0], { x: 304, y: 342, angle: 1.35, state: 'INVESTIGATE', alertIcon: '?' });
+    Object.assign(s.guards[1], { x: 966, y: 208, angle: 1.44, fov: 0.78, range: 196 });
+    s.cameras[0].jammedTimer = 5.4;
+    s.empWaves.push({ x: 258, y: 132, radius: 92, maxRadius: 140, timer: 0.9, maxTimer: 1.4 });
+    Object.assign(s.cameras[1], { angle: 0.0, fov: 0.68, range: 240 });
+    s.smokes.push({ x: 654, y: 230, radius: 54, timer: 5.2, maxTimer: 6.0 });
+    Object.assign(s.lasers[0], { permanentlyDisabled: true, active: false });
+    return recomputeCones(s);
   }
 
   if (key === 'caught') {
-    const state = buildMultiRouteFloor(0);
-    state.screen = 'caught';
-    state.time = 3.1;
-    state.purse = 1050;
-    state.toolsSpent = 150;
-    state.alarm = 100;
-    state.peakAlarm = 100;
-    state.wasSpotted = true;
-    state.alarmState = 'CAUGHT';
-    state.caughtBy = 'GUARD 1';
-
-    state.thief.x = 434;
-    state.thief.y = 166;
-    state.thief.angle = 2.6;
-    state.thief.inCover = false;
-
-    const g1 = state.guards[0];
-    g1.x = 594;
-    g1.y = 122;
-    g1.angle = Math.atan2(state.thief.y - g1.y, state.thief.x - g1.x);
-    g1.state = 'SPOTTED';
-    g1.alertIcon = '!';
-    g1.lockTimer = 0.45;
-    state.caughtSource = { x: g1.x, y: g1.y };
-
-    const g2 = state.guards[1];
-    g2.x = 890;
-    g2.y = 220;
-    g2.angle = 1.57;
-
-    state.cameras[0].x = 294;
-    state.cameras[0].y = 42;
-    state.cameras[0].angle = 2.02;
-    state.cameras[0].range = 175;
-
-    recomputeAllCones(state);
-    return state;
+    Object.assign(s, { screen: 'caught', purse: 1050, toolsSpent: 150, alarm: 100, peakAlarm: 100, wasSpotted: true, alarmState: 'CAUGHT', caughtBy: 'GUARD 1' });
+    Object.assign(s.thief, { x: 434, y: 166, angle: 2.6, inCover: false });
+    const g1 = s.guards[0];
+    Object.assign(g1, { x: 594, y: 122, angle: Math.atan2(166 - 122, 434 - 594), state: 'SPOTTED', alertIcon: '!', lockTimer: 0.45 });
+    s.caughtSource = { x: g1.x, y: g1.y };
+    Object.assign(s.guards[1], { x: 890, y: 220, angle: 1.57 });
+    Object.assign(s.cameras[0], { x: 294, y: 42, angle: 2.02, range: 175 });
+    return recomputeCones(s);
   }
 
-  const state = buildMultiRouteFloor(3);
-  state.screen = 'getaway';
-  state.time = 6.8;
-  state.purse = 650;
-  state.toolsSpent = 550;
-  state.alarm = 18;
-  state.peakAlarm = 18;
-  state.wasSpotted = false;
-  state.alarmState = 'CLEAN';
-
-  state.thief.x = state.exit.x - 22;
-  state.thief.y = state.exit.y + state.exit.h * 0.5;
-  state.thief.angle = 0;
-  state.thief.lootSecured = true;
-
-  state.lasers[0].permanentlyDisabled = true;
-  state.lasers[0].active = false;
-  state.guards[0].x = 220;
-  state.guards[0].y = 84;
-  state.guards[0].angle = 0;
-  state.guards[1].x = 186;
-  state.guards[1].y = 434;
-  state.guards[1].angle = -0.4;
-  state.guards[2].x = 870;
-  state.guards[2].y = 415;
-  state.guards[2].angle = -1.7;
-
-  state.payout = evaluateGetawayPayoff(state);
-  recomputeAllCones(state);
-  return state;
+  Object.assign(s, { screen: 'getaway', purse: 650, toolsSpent: 550, alarm: 18, peakAlarm: 18, wasSpotted: false, alarmState: 'CLEAN' });
+  Object.assign(s.thief, { x: s.exit.x - 26, y: s.exit.y + s.exit.h * 0.5, angle: 0, lootSecured: true });
+  Object.assign(s.lasers[0], { permanentlyDisabled: true, active: false });
+  Object.assign(s.guards[0], { x: 220, y: 84, angle: 0 });
+  Object.assign(s.guards[1], { x: 186, y: 434, angle: -0.4 });
+  Object.assign(s.guards[2], { x: 870, y: 415, angle: -1.7 });
+  s.payout = evaluateGetawayPayoff(s);
+  return recomputeCones(s);
 }
 
-function recomputeAllCones(state) {
+function recomputeCones(state) {
   for (const g of state.guards) {
     g.conePoly = computeOccludedVisionCone(g.x, g.y, g.angle, g.fov * 0.5, g.range, state.wallSegments, state.smokes);
   }
   for (const c of state.cameras) {
-    c.conePoly =
-      c.jammedTimer > 0
-        ? []
-        : computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 38);
+    c.conePoly = c.jammedTimer > 0 ? [] : computeOccludedVisionCone(c.x, c.y, c.angle, c.fov * 0.5, c.range, state.wallSegments, state.smokes, 38);
   }
+  return state;
 }

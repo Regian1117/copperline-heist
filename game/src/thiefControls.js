@@ -1,4 +1,6 @@
-/* Keyboard and mouse input binding, smooth wall sliding, cover detection, and vent traversal. */
+/* Keyboard and mouse input binding and thief movement through walls, cover alcoves, and vents. */
+
+import { isThiefInSafeCover, resolveVentTraversal } from './routesAndCover.js';
 
 export const THIEF_WALK_SPEED = 186;
 export const THIEF_SNEAK_SPEED = 114;
@@ -28,9 +30,7 @@ export function readKeyboardAndMouseControls(canvas, getLayout, callbacks) {
     else if (code === 'Space') callbacks.onSpacePress();
   };
 
-  const onKeyUp = (e) => {
-    keys.delete(e.code);
-  };
+  const onKeyUp = (e) => keys.delete(e.code);
 
   const updatePointer = (e) => {
     const rect = canvas.getBoundingClientRect();
@@ -44,10 +44,7 @@ export function readKeyboardAndMouseControls(canvas, getLayout, callbacks) {
     pointer.insideArena = wx >= 0 && wx <= layout.worldW && wy >= 0 && wy <= layout.worldH;
   };
 
-  const onPointerMove = (e) => {
-    updatePointer(e);
-  };
-
+  const onPointerMove = (e) => updatePointer(e);
   const onPointerDown = (e) => {
     if (e.button !== 0) return;
     updatePointer(e);
@@ -102,62 +99,11 @@ export function moveThiefThroughCover(state, moveVec, sneaking, dt) {
     thief.angle = Math.atan2(thief.vy, thief.vx);
   }
 
-  let nextX = thief.x + thief.vx * dt;
-  let nextY = thief.y + thief.vy * dt;
+  const stepX = resolveVentTraversal(thief.x + thief.vx * dt, thief.y, thief.radius, walls, vents, true);
+  const stepY = resolveVentTraversal(stepX.coord, thief.y + thief.vy * dt, thief.radius, walls, vents, false);
 
-  const insideVentNow = vents.some((v) => v.bypassed && pointNearRect(nextX, nextY, v.rect, 10));
-
-  nextX = resolveAxis(nextX, thief.y, thief.radius, walls, vents, insideVentNow, true);
-  nextY = resolveAxis(nextX, nextY, thief.radius, walls, vents, insideVentNow, false);
-
-  thief.x = Math.max(26, Math.min(state.width - 26, nextX));
-  thief.y = Math.max(26, Math.min(state.height - 26, nextY));
-
-  thief.inCover = covers.some((c) => pointInRect(thief.x, thief.y, c));
-  thief.inVent = vents.some((v) => v.bypassed && pointInRect(thief.x, thief.y, v.rect));
-}
-
-function resolveAxis(cx, cy, radius, walls, vents, inVent, isX) {
-  let x = cx;
-  let y = cy;
-  for (const w of walls) {
-    if (inVent && isVentPassableWall(w, vents)) continue;
-    const closestX = Math.max(w.x, Math.min(x, w.x + w.w));
-    const closestY = Math.max(w.y, Math.min(y, w.y + w.h));
-    const dx = x - closestX;
-    const dy = y - closestY;
-    const distSq = dx * dx + dy * dy;
-    if (distSq < radius * radius) {
-      const dist = Math.sqrt(distSq);
-      if (dist > 1e-4) {
-        const push = radius - dist;
-        x += (dx / dist) * push;
-        y += (dy / dist) * push;
-      } else if (isX) {
-        x = x < w.x + w.w * 0.5 ? w.x - radius : w.x + w.w + radius;
-      } else {
-        y = y < w.y + w.h * 0.5 ? w.y - radius : w.y + w.h + radius;
-      }
-    }
-  }
-  return isX ? x : y;
-}
-
-function isVentPassableWall(wall, vents) {
-  if (wall.x === 0 || wall.y === 0 || wall.x + wall.w >= 1040 || wall.y + wall.h >= 560) return false;
-  for (const v of vents) {
-    if (!v.bypassed) continue;
-    const r = v.rect;
-    const overlap = wall.x < r.x + r.w + 4 && wall.x + wall.w > r.x - 4 && wall.y < r.y + r.h + 4 && wall.y + wall.h > r.y - 4;
-    if (overlap) return true;
-  }
-  return false;
-}
-
-function pointInRect(x, y, r) {
-  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
-}
-
-function pointNearRect(x, y, r, pad) {
-  return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad;
+  thief.x = Math.max(26, Math.min(state.width - 26, stepX.coord));
+  thief.y = Math.max(26, Math.min(state.height - 26, stepY.coord));
+  thief.inCover = isThiefInSafeCover(thief.x, thief.y, covers);
+  thief.inVent = stepY.inVent;
 }

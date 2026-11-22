@@ -7,7 +7,7 @@ export function renderHighOcrHud(ctx, state, layout, hitBoxes) {
   hitBoxes.length = 0;
   const { vw, vh, topBarH, bottomBarH } = layout;
   const compact = vw < 1140;
-  const fontSize = compact ? 15 : 17;
+  const fontSize = compact ? 17 : 19;
 
   ctx.save();
   ctx.fillStyle = '#0B1220';
@@ -15,16 +15,16 @@ export function renderHighOcrHud(ctx, state, layout, hitBoxes) {
   ctx.fillStyle = '#E0B86A';
   ctx.fillRect(0, topBarH - 2, vw, 2);
 
-  const pillH = topBarH - 18;
+  const pillH = topBarH - 16;
   const pillY = Math.round((topBarH - pillH) * 0.5) - 1;
   const gap = compact ? 8 : 12;
-  let curX = compact ? 12 : 18;
+  let curX = compact ? 10 : 16;
 
-  curX = drawTopCreamPill(ctx, curX, pillY, pillH, `COPPERLINE · ${state.code}`, '#E0B86A', fontSize) + gap;
-  curX = drawTopCreamPill(ctx, curX, pillY, pillH, `TAKE $${state.lootValue.toLocaleString()}`, '#FFD166', fontSize) + gap;
-  drawTopCreamPill(ctx, curX, pillY, pillH, `PURSE $${state.purse.toLocaleString()}`, '#94A3B8', fontSize);
+  curX = drawTopCreamPill(ctx, curX, pillY, pillH, `COPPERLINE · ${state.code}`, '#E0B86A', fontSize, compact ? 12 : 15) + gap;
+  curX = drawTopCreamPill(ctx, curX, pillY, pillH, `TAKE $${state.lootValue.toLocaleString()}`, '#FFD166', fontSize, compact ? 12 : 15) + gap;
+  drawTopCreamPill(ctx, curX, pillY, pillH, `PURSE $${state.purse.toLocaleString()}`, '#94A3B8', fontSize, compact ? 12 : 15);
 
-  drawAlarmPill(ctx, state, vw - (compact ? 12 : 18), pillY, pillH, compact ? 356 : 420, fontSize);
+  drawAlarmPill(ctx, state, vw - (compact ? 10 : 16), pillY, pillH, compact ? 372 : 446, fontSize);
 
   const bottomY = vh - bottomBarH;
   ctx.fillStyle = '#0B1220';
@@ -32,11 +32,11 @@ export function renderHighOcrHud(ctx, state, layout, hitBoxes) {
   ctx.fillStyle = '#E0B86A';
   ctx.fillRect(0, bottomY, vw, 2);
 
-  const cardH = bottomBarH - 18;
+  const cardH = bottomBarH - 16;
   const cardY = bottomY + Math.round((bottomBarH - cardH) * 0.5) + 1;
   const cardGap = compact ? 8 : 12;
-  const utilityW = compact ? 228 : 268;
-  const beltPad = compact ? 12 : 18;
+  const utilityW = compact ? 230 : 272;
+  const beltPad = compact ? 10 : 16;
   const availW = vw - beltPad * 2 - utilityW - cardGap;
   const cardW = Math.floor((availW - cardGap * 3) / 4);
 
@@ -73,17 +73,16 @@ export function renderOutcomeOverlay(ctx, state, layout, hitBoxes) {
   }
 }
 
-function drawTopCreamPill(ctx, x, y, h, text, borderColor, fontSize) {
+function drawTopCreamPill(ctx, x, y, h, text, borderColor, fontSize, padX) {
   ctx.save();
   ctx.font = `900 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
   const tw = Math.ceil(ctx.measureText(text).width);
-  const padX = 14;
   const w = tw + padX * 2;
   ctx.fillStyle = '#F6F2E8';
   roundRect(ctx, x, y, w, h, 8);
   ctx.fill();
   ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 2.4;
+  ctx.lineWidth = 2.6;
   roundRect(ctx, x, y, w, h, 8);
   ctx.stroke();
 
@@ -98,8 +97,7 @@ function drawTopCreamPill(ctx, x, y, h, text, borderColor, fontSize) {
 function drawAlarmPill(ctx, state, rightEdge, y, h, width, fontSize) {
   const pct = Math.round(state.alarm);
   const word = state.alarmState;
-  const accent =
-    word === 'CAUGHT' || word === 'ALERT' ? '#EF4444' : word === 'SUSPICIOUS' ? '#F59E0B' : '#10B981';
+  const accent = word === 'CAUGHT' || word === 'ALERT' ? '#EF4444' : word === 'SUSPICIOUS' ? '#F59E0B' : '#10B981';
 
   const x = rightEdge - width;
   ctx.save();
@@ -107,7 +105,7 @@ function drawAlarmPill(ctx, state, rightEdge, y, h, width, fontSize) {
   roundRect(ctx, x, y, width, h, 8);
   ctx.fill();
   ctx.strokeStyle = accent;
-  ctx.lineWidth = 2.8;
+  ctx.lineWidth = 3;
   roundRect(ctx, x, y, width, h, 8);
   ctx.stroke();
 
@@ -128,15 +126,15 @@ function drawAlarmPill(ctx, state, rightEdge, y, h, width, fontSize) {
 
   const barX = x + innerPad + leftW + 10;
   const barRight = x + width - innerPad - rightW - 10;
-  const barW = Math.max(48, barRight - barX);
-  const barH = 14;
+  const barW = Math.max(44, barRight - barX);
+  const barH = 16;
   const barY = y + Math.round((h - barH) * 0.5);
 
   ctx.fillStyle = '#D6D0C4';
   roundRect(ctx, barX, barY, barW, barH, 5);
   ctx.fill();
   ctx.strokeStyle = '#94A3B8';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.4;
   roundRect(ctx, barX, barY, barW, barH, 5);
   ctx.stroke();
 
@@ -151,7 +149,7 @@ function drawAlarmPill(ctx, state, rightEdge, y, h, width, fontSize) {
 
 function drawToolCard(ctx, x, y, w, h, tool, selected, affordable, compact) {
   ctx.save();
-  ctx.globalAlpha = affordable ? 1 : 0.84;
+  ctx.globalAlpha = affordable ? 1 : 0.86;
   ctx.fillStyle = selected ? '#FFFDF7' : affordable ? '#F6F2E8' : '#E7E2D6';
   roundRect(ctx, x, y, w, h, 8);
   ctx.fill();
@@ -160,14 +158,14 @@ function drawToolCard(ctx, x, y, w, h, tool, selected, affordable, compact) {
   roundRect(ctx, x, y, w, h, 8);
   ctx.stroke();
 
-  const iconX = x + (compact ? 18 : 22);
+  const iconX = x + (compact ? 17 : 22);
   const iconY = y + h * 0.5;
   drawToolIcon(ctx, tool.icon, iconX, iconY, compact ? 10 : 12);
 
   const label = `[${tool.key}] ${tool.label} ${tool.priceTag}`;
-  let fs = compact ? 13 : 16;
+  let fs = compact ? 15 : 18;
   ctx.font = `900 ${fs}px "Segoe UI", system-ui, sans-serif`;
-  const maxTextW = w - (compact ? 36 : 46);
+  const maxTextW = w - (compact ? 35 : 46);
   while (ctx.measureText(label).width > maxTextW && fs > 11) {
     fs -= 1;
     ctx.font = `900 ${fs}px "Segoe UI", system-ui, sans-serif`;
@@ -176,7 +174,7 @@ function drawToolCard(ctx, x, y, w, h, tool, selected, affordable, compact) {
   ctx.fillStyle = '#080C18';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, iconX + (compact ? 15 : 19), y + h * 0.5 + 1);
+  ctx.fillText(label, iconX + (compact ? 14 : 18), y + h * 0.5 + 1);
   ctx.restore();
 }
 
@@ -240,7 +238,7 @@ function drawUtilityPill(ctx, x, y, w, h, label, active, activeColor, compact) {
   roundRect(ctx, x, y, w, h, 8);
   ctx.stroke();
 
-  let fs = compact ? 12 : 14;
+  let fs = compact ? 13 : 15;
   ctx.font = `900 ${fs}px "Segoe UI", system-ui, sans-serif`;
   while (ctx.measureText(label).width > w - 12 && fs > 10) {
     fs -= 1;
@@ -276,7 +274,7 @@ function drawTitleOverlay(ctx, state, layout, hitBoxes) {
   ctx.stroke();
 
   ctx.fillStyle = '#F6F2E8';
-  ctx.font = '900 40px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 42px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('COPPERLINE', cx, y + 54);
@@ -301,24 +299,24 @@ function drawTitleOverlay(ctx, state, layout, hitBoxes) {
     roundRect(ctx, px, pillY, pillW, pillH, 8);
     ctx.stroke();
     ctx.fillStyle = active ? '#080C18' : '#CBD5E1';
-    ctx.font = '900 13px "Segoe UI", system-ui, sans-serif';
+    ctx.font = '900 14px "Segoe UI", system-ui, sans-serif';
     ctx.fillText(fl.code, px + pillW * 0.5, pillY + pillH * 0.5 + 1);
     hitBoxes.push({ id: `floor-${i}`, type: 'floor', index: i, x: px, y: pillY, w: pillW, h: pillH });
   }
 
   const btnW = cardW - 56;
-  const btnH = 54;
+  const btnH = 56;
   const btnX = x + 28;
   const btnY = y + 182;
   ctx.fillStyle = '#10B981';
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.fill();
   ctx.strokeStyle = '#A7F3D0';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.6;
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.stroke();
   ctx.fillStyle = '#06281E';
-  ctx.font = '900 20px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
   ctx.fillText('START HEIST  ▸', cx, btnY + btnH * 0.5 + 1);
   hitBoxes.push({ id: 'start', type: 'start', x: btnX, y: btnY, w: btnW, h: btnH });
 
@@ -332,10 +330,10 @@ function drawCaughtModal(ctx, state, layout, hitBoxes) {
   const { vw, vh, topBarH, bottomBarH, worldX, worldY, worldScale } = layout;
   const midH = vh - topBarH - bottomBarH;
   const cx = vw * 0.5;
-  const cardW = Math.min(500, vw - 70);
-  const cardH = 216;
+  const cardW = Math.min(560, vw - 56);
+  const cardH = 236;
   const x = cx - cardW * 0.5;
-  const y = topBarH + midH - cardH - 36;
+  const y = topBarH + midH - cardH - 28;
 
   ctx.save();
   ctx.fillStyle = 'rgba(6, 10, 18, 0.44)';
@@ -346,14 +344,14 @@ function drawCaughtModal(ctx, state, layout, hitBoxes) {
     const sy = worldY + state.caughtSource.y * worldScale;
     const tx = worldX + state.thief.x * worldScale;
     const ty = worldY + state.thief.y * worldScale;
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-    ctx.lineWidth = 11;
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.42)';
+    ctx.lineWidth = 12;
     ctx.beginPath();
     ctx.moveTo(sx, sy);
     ctx.lineTo(tx, ty);
     ctx.stroke();
     ctx.strokeStyle = '#FF4D4D';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.8;
     ctx.setLineDash([10, 6]);
     ctx.beginPath();
     ctx.moveTo(sx, sy);
@@ -361,9 +359,9 @@ function drawCaughtModal(ctx, state, layout, hitBoxes) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = '#FF4D4D';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
-    ctx.arc(tx, ty, 22 * worldScale, 0, Math.PI * 2);
+    ctx.arc(tx, ty, 24 * worldScale, 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -371,35 +369,35 @@ function drawCaughtModal(ctx, state, layout, hitBoxes) {
   roundRect(ctx, x, y, cardW, cardH, 14);
   ctx.fill();
   ctx.strokeStyle = '#EF4444';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 4;
   roundRect(ctx, x, y, cardW, cardH, 14);
   ctx.stroke();
 
   const title = `SPOTTED BY ${state.caughtBy || 'GUARD 1'}`;
   ctx.fillStyle = '#FEF2F2';
-  ctx.font = '900 32px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 39px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(title, cx, y + 54);
+  ctx.fillText(title, cx, y + 58);
 
-  ctx.fillStyle = '#CBD5E1';
-  ctx.font = '700 16px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText('0.45s detection window — use cover or tools', cx, y + 98);
+  ctx.fillStyle = '#E2E8F0';
+  ctx.font = '700 18px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('0.45s detection window — use cover or tools', cx, y + 108);
 
-  const btnW = cardW - 64;
-  const btnH = 54;
-  const btnX = x + 32;
-  const btnY = y + 132;
+  const btnW = cardW - 56;
+  const btnH = 60;
+  const btnX = x + 28;
+  const btnY = y + 146;
   ctx.fillStyle = '#10B981';
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.fill();
   ctx.strokeStyle = '#A7F3D0';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.8;
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.stroke();
 
   ctx.fillStyle = '#06281E';
-  ctx.font = '900 20px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 24px "Segoe UI", system-ui, sans-serif';
   ctx.fillText('[R] RETRY FLOOR', cx, btnY + btnH * 0.5 + 1);
   hitBoxes.push({ id: 'retry', type: 'retry', x: btnX, y: btnY, w: btnW, h: btnH });
   ctx.restore();
@@ -410,10 +408,15 @@ function drawGetawayLedgerModal(ctx, state, layout, hitBoxes) {
   const midH = vh - topBarH - bottomBarH;
   const cx = vw * 0.5;
   const cy = topBarH + midH * 0.5;
-  const payout = state.payout || { loot: state.lootValue, tools: state.toolsSpent, ghostBonus: 4500, netTake: state.lootValue + 4500 - state.toolsSpent };
+  const payout = state.payout || {
+    loot: state.lootValue,
+    tools: state.toolsSpent,
+    ghostBonus: 4500,
+    netTake: state.lootValue + 4500 - state.toolsSpent,
+  };
 
-  const cardW = Math.min(540, vw - 64);
-  const cardH = 356;
+  const cardW = Math.min(596, vw - 52);
+  const cardH = 414;
   const x = cx - cardW * 0.5;
   const y = cy - cardH * 0.5;
 
@@ -425,20 +428,20 @@ function drawGetawayLedgerModal(ctx, state, layout, hitBoxes) {
   roundRect(ctx, x, y, cardW, cardH, 14);
   ctx.fill();
   ctx.strokeStyle = '#10B981';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 4;
   roundRect(ctx, x, y, cardW, cardH, 14);
   ctx.stroke();
 
   const floorNum = state.floorIndex + 1;
-  ctx.fillStyle = '#10B981';
-  ctx.font = '900 14px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = '#34D399';
+  ctx.font = '900 16px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`COPPERLINE · FL ${floorNum} GETAWAY COMPLETE`, cx, y + 34);
+  ctx.fillText(`COPPERLINE · FL ${floorNum} GETAWAY COMPLETE`, cx, y + 36);
 
   ctx.fillStyle = '#F6F2E8';
-  ctx.font = '900 28px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText('GETAWAY PAYOUT LEDGER', cx, y + 68);
+  ctx.font = '900 34px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText('GETAWAY PAYOUT LEDGER', cx, y + 76);
 
   const rows = [
     { icon: '◆', iconColor: '#FFD166', label: 'LOOT', value: `+$${payout.loot.toLocaleString()}`, valColor: '#FFD166' },
@@ -448,57 +451,57 @@ function drawGetawayLedgerModal(ctx, state, layout, hitBoxes) {
 
   const rowX = x + 36;
   const rowRight = x + cardW - 36;
-  let ry = y + 118;
+  let ry = y + 134;
   for (const row of rows) {
     ctx.fillStyle = row.iconColor;
-    ctx.font = '900 18px "Segoe UI", system-ui, sans-serif';
+    ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(row.icon, rowX, ry);
 
-    ctx.fillStyle = '#E2E8F0';
-    ctx.font = '800 18px "Segoe UI", system-ui, sans-serif';
-    ctx.fillText(row.label, rowX + 28, ry);
+    ctx.fillStyle = '#F1F5F9';
+    ctx.font = '900 22px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText(row.label, rowX + 32, ry);
 
     ctx.fillStyle = row.valColor;
-    ctx.font = '900 20px "Segoe UI", system-ui, sans-serif';
+    ctx.font = '900 25px Consolas, "Segoe UI", monospace';
     ctx.textAlign = 'right';
     ctx.fillText(row.value, rowRight, ry);
-    ry += 38;
+    ry += 44;
   }
 
-  ctx.strokeStyle = 'rgba(224, 184, 106, 0.55)';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(224, 184, 106, 0.65)';
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
-  ctx.moveTo(rowX, ry - 12);
-  ctx.lineTo(rowRight, ry - 12);
+  ctx.moveTo(rowX, ry - 14);
+  ctx.lineTo(rowRight, ry - 14);
   ctx.stroke();
 
-  ry += 16;
+  ry += 20;
   ctx.fillStyle = '#F6F2E8';
-  ctx.font = '900 21px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 26px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('NET TAKE', rowX, ry);
 
   ctx.fillStyle = '#34D399';
-  ctx.font = '900 26px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 32px Consolas, "Segoe UI", monospace';
   ctx.textAlign = 'right';
   ctx.fillText(`+$${payout.netTake.toLocaleString()}`, rowRight, ry);
 
-  const btnW = cardW - 64;
-  const btnH = 54;
-  const btnX = x + 32;
-  const btnY = y + cardH - btnH - 24;
+  const btnW = cardW - 56;
+  const btnH = 60;
+  const btnX = x + 28;
+  const btnY = y + cardH - btnH - 26;
   const isFinal = state.floorIndex === COPPERLINE_FLOORS.length - 1;
   ctx.fillStyle = '#10B981';
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.fill();
   ctx.strokeStyle = '#A7F3D0';
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.8;
   roundRect(ctx, btnX, btnY, btnW, btnH, 10);
   ctx.stroke();
 
   ctx.fillStyle = '#06281E';
-  ctx.font = '900 20px "Segoe UI", system-ui, sans-serif';
+  ctx.font = '900 24px "Segoe UI", system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(isFinal ? 'PLAY AGAIN  →' : 'NEXT FLOOR  →', cx, btnY + btnH * 0.5 + 1);
   hitBoxes.push({ id: 'next', type: 'next', x: btnX, y: btnY, w: btnW, h: btnH });
